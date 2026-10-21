@@ -1,0 +1,56 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "npm",
+      "script": "watch",
+      "problemMatcher": {
+        "owner": "esbuild",
+        "fileLocation": ["relative"],
+        "pattern": {
+          "regexp": "^(.*):(\\d+):(\\d+):\\s+(error|warning):\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^\\[whycommit\\] build started$",
+          "endsPattern": "^\\[whycommit\\] build finished$"
+        }
+      },
+      "isBackground": true,
+      "presentation": {
+        "reveal": "never",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "type": "npm",
+      "script": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "never",
+        "panel": "dedicated"
+      },
+      "group": "build"
+    },
+    {
+      "type": "npm",
+      "script": "typecheck",
+      "problemMatcher": "$tsc",
+      "presentation": {
+        "reveal": "never",
+        "panel": "dedicated"
+      },
+      "group": "test"
+    }
+  ]
+}

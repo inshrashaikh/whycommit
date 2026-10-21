@@ -1,0 +1,4 @@
+# Placeholder for GitHub Actions workflows.
+#
+# Suggested first workflow: a Node matrix that runs `npm ci`, `npm run lint`,
+# `npm run typecheck` and `npm run build` on every push and pull request.

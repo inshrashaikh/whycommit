@@ -1,0 +1,176 @@
+{
+  "name": "whycommit",
+  "displayName": "Whycommit",
+  "description": "Generates meaningful Git commit messages from your staged changes using Claude, OpenAI-compatible APIs, or a local Ollama model.",
+  "version": "0.1.0",
+  "publisher": "whycommit",
+  "license": "SEE LICENSE IN LICENSE",
+  "private": true,
+  "author": {
+    "name": "Shaikh Inshra"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "SCM Providers",
+    "Other"
+  ],
+  "keywords": [
+    "git",
+    "commit",
+    "commit message",
+    "ai",
+    "claude",
+    "anthropic",
+    "openai",
+    "ollama"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "extensionDependencies": [
+    "vscode.git"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false
+    },
+    "virtualWorkspaces": false
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "whycommit.generate",
+        "title": "Whycommit: Generate Commit Message",
+        "category": "Whycommit",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "whycommit.setApiKey",
+        "title": "Whycommit: Set API Key",
+        "category": "Whycommit",
+        "icon": "$(key)"
+      }
+    ],
+    "menus": {
+      "scm/title": [
+        {
+          "command": "whycommit.generate",
+          "when": "scmProvider == 'git' && whycommit.hasRepository",
+          "group": "navigation@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "whycommit.generate",
+          "when": "true"
+        },
+        {
+          "command": "whycommit.setApiKey",
+          "when": "true"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Whycommit",
+      "properties": {
+        "whycommit.provider": {
+          "type": "string",
+          "enum": [
+            "anthropic",
+            "openai",
+            "ollama"
+          ],
+          "enumDescriptions": [
+            "Anthropic Claude (default)",
+            "OpenAI or any OpenAI-compatible endpoint",
+            "Local Ollama server"
+          ],
+          "default": "anthropic",
+          "description": "Which LLM provider generates the commit message."
+        },
+        "whycommit.model": {
+          "type": "string",
+          "default": "",
+          "description": "Model id sent to the provider. Leave empty to use the provider default."
+        },
+        "whycommit.baseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Base URL of the provider API. Leave empty to use the provider default. Use this for OpenAI-compatible gateways, proxies or a remote Ollama host."
+        },
+        "whycommit.maxDiffTokens": {
+          "type": "number",
+          "default": 12000,
+          "minimum": 500,
+          "maximum": 200000,
+          "description": "Approximate token budget for the staged diff that is sent to the model. Larger diffs are truncated."
+        },
+        "whycommit.language": {
+          "type": "string",
+          "enum": [
+            "english",
+            "hinglish"
+          ],
+          "enumDescriptions": [
+            "Write the commit message in English",
+            "Write the commit message in Hinglish (Romanized Hindi + English)"
+          ],
+          "default": "english",
+          "description": "Language used for the generated commit message."
+        },
+        "whycommit.temperature": {
+          "type": "number",
+          "default": 0.3,
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Sampling temperature passed to the provider."
+        },
+        "whycommit.maxOutputTokens": {
+          "type": "number",
+          "default": 512,
+          "minimum": 64,
+          "maximum": 8192,
+          "description": "Maximum number of tokens the model may use for the commit message."
+        },
+        "whycommit.recentCommitCount": {
+          "type": "number",
+          "default": 10,
+          "minimum": 0,
+          "maximum": 50,
+          "description": "How many recent commit messages are sent as a style reference."
+        },
+        "whycommit.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the Whycommit status bar item."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.js --production",
+    "watch": "node esbuild.js --watch",
+    "compile": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\" \"*.json\" \"*.md\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"*.json\" \"*.md\"",
+    "test": "npm run typecheck",
+    "package": "npm run build && vsce package --no-dependencies --allow-missing-repository",
+    "vscode:prepublish": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "@vscode/vsce": "^2.32.0",
+    "esbuild": "^0.23.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.5.4"
+  }
+}

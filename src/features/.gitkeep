@@ -1,0 +1,2 @@
+# Placeholder for upcoming features. Each feature gets its own folder with an
+# index.ts that exports the feature's commands and UI contributions.

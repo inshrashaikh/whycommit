@@ -1,0 +1,6 @@
+# Placeholder for the automated test suite.
+#
+# The extension currently ships without unit tests. `npm test` runs the strict
+# TypeScript type check so that a broken build fails fast. Add Mocha/Vitest
+# based tests for the pure modules (diffProcessor, promptBuilder, commitMessage)
+# here later on.
