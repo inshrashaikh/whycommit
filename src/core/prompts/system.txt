@@ -13,5 +13,6 @@ Rules you must always follow:
 7. Never invent changes that are not present in the diff and never ask questions.
 8. If the diff contains credentials, tokens or personal data, describe the change in general terms and never repeat the secret values.
 9. Prefer the wording and level of detail used by the recent commit messages when they are provided.
+{{commitrc}}
 
 Return only the commit message itself. No code fences, no explanation, no preamble, no quotes around it.

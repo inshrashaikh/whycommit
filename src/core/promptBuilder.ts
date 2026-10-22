@@ -2,7 +2,9 @@
 // Proprietary - see LICENSE. No copying, modification, distribution or reuse permitted.
 
 import { LANGUAGE_LABELS, type OutputLanguage } from '../config/settings';
+import { describeCommitrc, type CommitrcConfig } from './commitrc';
 import type { ProcessedDiff } from './diffProcessor';
+import { describeStyle, type StyleDetection } from './styleDetector';
 import type { CompletionRequest } from '../llm/provider';
 
 import commitTemplate from './prompts/commit.txt';
@@ -17,6 +19,14 @@ export interface CommitPromptContext {
   recentCommits: string[];
   /** Language the message should be written in. */
   language: OutputLanguage;
+  /** The commit style that was detected in the repository history. */
+  style?: StyleDetection;
+  /** The validated `.commitrc` configuration of the repository. */
+  commitrc?: CommitrcConfig | null;
+  /** Types that were observed in the repository history. */
+  detectedTypes?: string[];
+  /** Scopes that were observed in the repository history. */
+  detectedScopes?: string[];
 }
 
 /**
@@ -30,16 +40,36 @@ export class PromptBuilder {
         ? context.recentCommits.map((subject) => `- ${subject}`).join('\n')
         : '- (no commit history available)';
 
+    const commitrcInstructions = describeCommitrc(context.commitrc ?? null);
+
     return {
-      system: render(stripFileHeader(systemTemplate), {}),
+      system: render(stripFileHeader(systemTemplate), {
+        commitrc: commitrcInstructions.length > 0 ? commitrcInstructions.join('\n') : '',
+      }),
       user: render(stripFileHeader(commitTemplate), {
         branch: context.branch || 'unknown',
         language: LANGUAGE_LABELS[context.language] ?? LANGUAGE_LABELS.english,
+        style: context.style
+          ? describeStyle(context.style)
+          : describeStyle({
+              style: 'unknown',
+              confidence: 0,
+              sampleSize: 0,
+              types: [],
+              scopes: [],
+              hasBreakingChanges: false,
+            }),
+        commitrc: commitrcInstructions.length > 0 ? commitrcInstructions.join('\n') : '',
         recentCommits,
         diff: context.diff.text,
       }),
     };
   }
+}
+
+/** Replaces `{{placeholders}}` in a template with the given values. */
+export function render(template: string, values: Record<string, string>): string {
+  return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_match, key: string) => values[key] ?? '');
 }
 
 /**
@@ -55,9 +85,4 @@ export function stripFileHeader(template: string): string {
     index += 1;
   }
   return lines.slice(index).join('\n').replace(/^\s+/, '');
-}
-
-/** Replaces `{{placeholders}}` in a template with the given values. */
-export function render(template: string, values: Record<string, string>): string {
-  return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_match, key: string) => values[key] ?? '');
 }

@@ -7,6 +7,10 @@ Write a Git commit message for the staged changes below.
 - Current branch: {{branch}}
 - Write the message in: {{language}}
 
+## Commit style used in this repository
+{{style}}
+{{commitrc}}
+
 ## Recent commit messages (use them only as a style reference, never repeat them)
 {{recentCommits}}
 

@@ -5,6 +5,7 @@ import { execFile } from 'child_process';
 import * as vscode from 'vscode';
 import type { API as GitAPI, GitExtension, LogEntry, Repository } from 'vscode.git';
 import { promisify } from 'util';
+import { COMMITRC_FILENAMES } from '../core/commitrc';
 import { Logger } from '../utils/logger';
 
 const execFileAsync = promisify(execFile);
@@ -59,51 +60,111 @@ export class GitService implements vscode.Disposable {
     return this.stateEmitter.event;
   }
 
-  /** Returns the repository Whycommit should operate on. */
+  /** All repositories that the git extension knows about. */
+  get repositories(): Repository[] {
+    return this.gitApi?.repositories ?? [];
+  }
+
+  /** The repository that owns the active editor, if any. */
+  get activeEditorRepository(): Repository | undefined {
+    const activeUri = vscode.window.activeTextEditor?.document.uri;
+    if (!activeUri || activeUri.scheme !== 'file') {
+      return undefined;
+    }
+    return this.findRepositoryByPath(activeUri.fsPath);
+  }
+
+  /**
+   * The repository Whycommit should operate on.
+   *
+   * In a multi-root workspace the repository of the active editor wins. When
+   * there is no active editor the first repository is used; the caller can
+   * disambiguate with {@link pickRepository}.
+   */
   get activeRepository(): Repository | undefined {
-    const repositories = this.gitApi?.repositories ?? [];
+    return this.activeEditorRepository ?? this.repositories[0];
+  }
+
+  /** Finds the repository whose root contains the given file path. */
+  findRepositoryByPath(filePath: string): Repository | undefined {
+    const normalized = filePath.toLowerCase();
+    return this.repositories.find((repository) => {
+      const root = repository.rootUri.fsPath.toLowerCase();
+      return (
+        normalized === root ||
+        normalized.startsWith(`${root}/`) ||
+        normalized.startsWith(`${root}\\`)
+      );
+    });
+  }
+
+  /**
+   * Lets the user choose a repository when several are open.
+   *
+   * @returns The chosen repository, or `undefined` when the user cancels.
+   */
+  async pickRepository(): Promise<Repository | undefined> {
+    const repositories = this.repositories;
     if (repositories.length === 0) {
       return undefined;
     }
-
-    // Prefer the repository that owns the active editor.
-    const activeUri = vscode.window.activeTextEditor?.document.uri;
-    if (activeUri && activeUri.scheme === 'file') {
-      const activePath = activeUri.fsPath.toLowerCase();
-      const match = repositories.find((repository) => {
-        const root = repository.rootUri.fsPath.toLowerCase();
-        return (
-          activePath === root ||
-          activePath.startsWith(`${root}/`) ||
-          activePath.startsWith(`${root}\\`)
-        );
-      });
-      if (match) {
-        return match;
-      }
+    if (repositories.length === 1) {
+      return repositories[0];
     }
 
-    return repositories[0];
+    const items = repositories.map((repository) => ({
+      label:
+        vscode.workspace.asRelativePath(repository.rootUri, false) || repository.rootUri.fsPath,
+      description: repository.state.HEAD?.name ?? repository.state.HEAD?.commit?.substring(0, 7),
+      detail: repository.rootUri.fsPath,
+      repository,
+    }));
+
+    const picked = await vscode.window.showQuickPick(items, {
+      title: 'Whycommit: choose the repository',
+      placeHolder: 'Several Git repositories are open',
+    });
+
+    return picked?.repository;
   }
 
   /**
    * Returns the diff of the staged changes (index vs HEAD).
    *
-   * Falls back to the git CLI when the repository has no commits yet, because
-   * `diffIndexWithHEAD` cannot resolve `HEAD` in that situation.
+   * `git diff --cached` also works in a repository without any commit, so the
+   * CLI fallback covers that case as well.
    */
   async getStagedDiff(repository: Repository): Promise<string> {
     try {
-      return await repository.diffIndexWithHEAD();
+      const diff = await repository.diffIndexWithHEAD();
+      if (typeof diff === 'string' && diff.trim().length > 0) {
+        return diff;
+      }
+      // An empty result in a repository without commits still means "staged
+      // changes exist", so the CLI fallback is used to tell both cases apart.
+      if (this.hasCommits(repository)) {
+        return diff ?? '';
+      }
     } catch (error) {
       this.logger.debug('diffIndexWithHEAD failed, falling back to the git CLI.', error);
-      return this.getStagedDiffViaCli(repository);
     }
+    return this.getStagedDiffViaCli(repository);
+  }
+
+  /** True when the repository has at least one commit. */
+  hasCommits(repository: Repository): boolean {
+    return Boolean(repository.state.HEAD?.commit);
+  }
+
+  /** True when the repository is checked out at a detached HEAD. */
+  isDetachedHead(repository: Repository): boolean {
+    const head = repository.state.HEAD;
+    return Boolean(head && !head.name && head.commit);
   }
 
   /** Returns the most recent commits, newest first. */
   async getRecentCommits(repository: Repository, count: number): Promise<CommitReference[]> {
-    if (count <= 0) {
+    if (count <= 0 || !this.hasCommits(repository)) {
       return [];
     }
     try {
@@ -112,7 +173,7 @@ export class GitService implements vscode.Disposable {
         hash: entry.commit.substring(0, 7),
         subject: entry.message.split('\n')[0].trim(),
         author: entry.authorName ?? 'unknown',
-        date: entry.date ? entry.date.toISOString() : '',
+        date: entry.date instanceof Date ? entry.date.toISOString() : '',
       }));
     } catch (error) {
       this.logger.debug('Unable to read the commit log.', error);
@@ -120,7 +181,12 @@ export class GitService implements vscode.Disposable {
     }
   }
 
-  /** Returns the name of the branch that is currently checked out. */
+  /**
+   * Returns the name of the branch that is currently checked out.
+   *
+   * Detached HEADs are reported as `detached@<short hash>` and a repository
+   * without any commit as `unknown`.
+   */
   getCurrentBranch(repository: Repository): string {
     const head = repository.state.HEAD;
     if (!head) {
@@ -133,6 +199,51 @@ export class GitService implements vscode.Disposable {
       return `detached@${head.commit.substring(0, 7)}`;
     }
     return 'unknown';
+  }
+
+  /**
+   * Returns the upstream branch of the current branch, if the repository has a
+   * remote at all. Repositories without a remote simply return `undefined`.
+   */
+  async getUpstreamBranch(repository: Repository): Promise<string | undefined> {
+    const head = repository.state.HEAD;
+    if (!head?.name || !this.hasCommits(repository)) {
+      return undefined;
+    }
+
+    try {
+      const { stdout } = await execFileAsync(
+        'git',
+        ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'],
+        {
+          cwd: repository.rootUri.fsPath,
+          windowsHide: true,
+        },
+      );
+      const upstream = stdout.trim();
+      return upstream.length > 0 ? upstream : undefined;
+    } catch {
+      // No remote, no upstream, or the branch does not track anything.
+      return undefined;
+    }
+  }
+
+  /**
+   * Reads the `.commitrc` file of a repository, if there is one.
+   *
+   * @returns The raw file contents, or `undefined` when there is no such file.
+   */
+  async readCommitrc(repository: Repository): Promise<string | undefined> {
+    for (const filename of COMMITRC_FILENAMES) {
+      const uri = vscode.Uri.joinPath(repository.rootUri, filename);
+      try {
+        const bytes = await vscode.workspace.fs.readFile(uri);
+        return Buffer.from(bytes).toString('utf8');
+      } catch {
+        // File does not exist or cannot be read - try the next candidate.
+      }
+    }
+    return undefined;
   }
 
   private async getStagedDiffViaCli(repository: Repository): Promise<string> {

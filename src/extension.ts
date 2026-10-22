@@ -5,15 +5,21 @@ import * as vscode from 'vscode';
 import {
   getConfig,
   providerLabel,
+  PROVIDER_ORDER,
   PROVIDER_PRESETS,
   resolveBaseUrl,
   resolveModel,
-  type ProviderId,
+  type WhycommitConfig,
 } from './config/settings';
+import { parseCommitrc } from './core/commitrc';
 import { processDiff } from './core/diffProcessor';
 import { PromptBuilder } from './core/promptBuilder';
+import { scanSecrets } from './core/secretScanner';
+import { detectStyle } from './core/styleDetector';
 import { GitService } from './git/gitService';
 import { createProvider, ProviderError, secretKeyFor } from './llm/provider';
+import { withRetry } from './llm/retry';
+import { PrivacyNotice } from './ui/privacyNotice';
 import { ScmButton } from './ui/scmButton';
 import { StatusBar } from './ui/statusBar';
 import { sanitizeCommitMessage } from './utils/commitMessage';
@@ -23,6 +29,7 @@ interface Dependencies {
   gitService: GitService;
   statusBar: StatusBar;
   promptBuilder: PromptBuilder;
+  privacyNotice: PrivacyNotice;
   logger: Logger;
 }
 
@@ -32,8 +39,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const statusBar = new StatusBar();
   const scmButton = new ScmButton();
   const promptBuilder = new PromptBuilder();
+  const privacyNotice = new PrivacyNotice(context);
 
-  const dependencies: Dependencies = { gitService, statusBar, promptBuilder, logger };
+  const dependencies: Dependencies = {
+    gitService,
+    statusBar,
+    promptBuilder,
+    privacyNotice,
+    logger,
+  };
 
   context.subscriptions.push(logger, gitService, statusBar);
 
@@ -42,6 +56,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       generateCommitMessage(context, dependencies),
     ),
     vscode.commands.registerCommand('whycommit.setApiKey', () => setApiKey(context, logger)),
+    vscode.commands.registerCommand('whycommit.selectProvider', () => selectProvider(logger)),
+    vscode.commands.registerCommand('whycommit.showOutput', () => logger.show()),
   );
 
   try {
@@ -89,9 +105,10 @@ export function deactivate(): void {
  */
 async function generateCommitMessage(
   context: vscode.ExtensionContext,
-  { gitService, statusBar, promptBuilder, logger }: Dependencies,
+  { gitService, statusBar, promptBuilder, privacyNotice, logger }: Dependencies,
 ): Promise<void> {
-  const repository = gitService.activeRepository;
+  // In a multi-root workspace the user picks the repository.
+  const repository = await gitService.pickRepository();
   if (!repository) {
     void vscode.window.showErrorMessage(
       'Whycommit: no Git repository was found. Open a folder that contains a .git directory.',
@@ -101,6 +118,9 @@ async function generateCommitMessage(
 
   const config = getConfig();
   const preset = PROVIDER_PRESETS[config.provider];
+
+  // 0. The very first cloud request is announced to the user.
+  await privacyNotice.showIfNeeded(config.provider);
 
   // 1. The API key lives in the SecretStorage, never in the settings.
   const apiKey = await context.secrets.get(secretKeyFor(config.provider));
@@ -142,18 +162,49 @@ async function generateCommitMessage(
       `~${processed.estimatedTokens} tokens.`,
   );
 
-  // 4. Build the prompt.
+  // 4. Never send credentials to a remote model.
+  const scan = scanSecrets(processed.text);
+  let diffForPrompt = processed;
+  if (scan.findings.length > 0) {
+    diffForPrompt = { ...processed, text: scan.redactedText };
+    logger.warn(
+      `The staged diff contains ${scan.findings.length} possible credential(s) (highest severity: ${scan.severity}). They were redacted before sending.`,
+    );
+    void vscode.window.showWarningMessage(
+      `Whycommit: ${scan.findings.length} possible credential(s) were found in the staged changes and were redacted before sending.`,
+    );
+  }
+
+  // 5. Build the prompt.
   const recentCommits = await gitService.getRecentCommits(repository, config.recentCommitCount);
+  const subjects = recentCommits
+    .map((commit) => commit.subject)
+    .filter((subject) => subject.length > 0);
+  const style = detectStyle(subjects);
+
+  const commitrcContent = await gitService.readCommitrc(repository);
+  const commitrc = commitrcContent ? parseCommitrc(commitrcContent) : undefined;
+  if (commitrc && !commitrc.valid) {
+    logger.warn(`The .commitrc file of the repository is invalid: ${commitrc.errors.join(' ')}`);
+  }
+  if (commitrc?.warnings.length) {
+    logger.warn(
+      `The .commitrc file of the repository has warnings: ${commitrc.warnings.join(' ')}`,
+    );
+  }
+
   const prompt = promptBuilder.build({
-    diff: processed,
+    diff: diffForPrompt,
     branch: gitService.getCurrentBranch(repository),
-    recentCommits: recentCommits
-      .map((commit) => commit.subject)
-      .filter((subject) => subject.length > 0),
+    recentCommits: subjects,
     language: config.language,
+    style,
+    commitrc: commitrc?.config ?? null,
+    detectedTypes: style.types,
+    detectedScopes: style.scopes,
   });
 
-  // 5. Call the provider.
+  // 6. Call the provider.
   const provider = createProvider(config.provider);
   statusBar.showBusy();
 
@@ -168,14 +219,26 @@ async function generateCommitMessage(
         const controller = new AbortController();
         const cancellation = token.onCancellationRequested(() => controller.abort());
         try {
-          return await provider.generate(prompt, {
-            model: resolveModel(config),
-            baseUrl: resolveBaseUrl(config),
-            apiKey,
-            temperature: config.temperature,
-            maxOutputTokens: config.maxOutputTokens,
-            signal: controller.signal,
-          });
+          return await withRetry(
+            () =>
+              provider.generate(prompt, {
+                model: resolveModel(config),
+                baseUrl: resolveBaseUrl(config),
+                apiKey,
+                temperature: config.temperature,
+                maxOutputTokens: config.maxOutputTokens,
+                signal: controller.signal,
+              }),
+            {
+              maxAttempts: config.maxRetries + 1,
+              signal: controller.signal,
+              onRetry: (info) => {
+                logger.warn(
+                  `The provider returned ${info.error.kind}. Retrying in ${info.delayMs} ms (attempt ${info.nextAttempt}).`,
+                );
+              },
+            },
+          );
         } finally {
           cancellation.dispose();
         }
@@ -195,6 +258,12 @@ async function generateCommitMessage(
     statusBar.showIdle(preset.label, result.model);
     logger.info('Commit message written to the SCM input box.');
   } catch (error) {
+    if (error instanceof ProviderError && error.kind === 'cancelled') {
+      logger.info('The generation was cancelled by the user.');
+      statusBar.showIdle(preset.label, resolveModel(config));
+      return;
+    }
+
     const description = describeProviderError(error);
     logger.error('Failed to generate the commit message.', error);
     statusBar.showError(description);
@@ -208,10 +277,9 @@ async function generateCommitMessage(
  */
 async function setApiKey(context: vscode.ExtensionContext, logger: Logger): Promise<void> {
   const config = getConfig();
-  const providerIds: ProviderId[] = ['anthropic', 'openai', 'ollama'];
 
   const picked = await vscode.window.showQuickPick(
-    providerIds.map((id) => ({
+    PROVIDER_ORDER.map((id) => ({
       label: PROVIDER_PRESETS[id].label,
       description: id === config.provider ? 'active provider' : undefined,
       detail: PROVIDER_PRESETS[id].hint,
@@ -254,7 +322,7 @@ async function setApiKey(context: vscode.ExtensionContext, logger: Logger): Prom
       'Paste your API key. It is stored in the VS Code SecretStorage and never written to settings, logs or git.',
     password: true,
     ignoreFocusOut: true,
-    placeHolder: provider === 'ollama' ? 'optional for Ollama' : 'sk-...',
+    placeHolder: PROVIDER_PRESETS[provider].requiresApiKey ? 'sk-...' : 'optional for Ollama',
     validateInput: (input: string) => {
       const trimmed = input.trim();
       if (!trimmed) {
@@ -275,6 +343,74 @@ async function setApiKey(context: vscode.ExtensionContext, logger: Logger): Prom
   logger.info(`Stored a new ${provider} API key in the SecretStorage.`);
   void vscode.window.showInformationMessage(
     `Whycommit: the ${PROVIDER_PRESETS[provider].label} API key was stored securely.`,
+  );
+}
+
+/**
+ * Picks a provider preset and fills in its base URL and default model.
+ */
+async function selectProvider(logger: Logger): Promise<void> {
+  const config = getConfig();
+
+  const picked = await vscode.window.showQuickPick(
+    PROVIDER_ORDER.map((id) => ({
+      label: PROVIDER_PRESETS[id].label,
+      description: id === config.provider ? 'active' : undefined,
+      detail: PROVIDER_PRESETS[id].hint,
+      id,
+    })),
+    {
+      title: 'Whycommit: choose a provider preset',
+      placeHolder: PROVIDER_PRESETS[config.provider].label,
+    },
+  );
+
+  if (!picked) {
+    return;
+  }
+
+  const preset = PROVIDER_PRESETS[picked.id];
+  const section = vscode.workspace.getConfiguration('whycommit');
+
+  await section.update('provider', preset.id, vscode.ConfigurationTarget.Global);
+
+  if (preset.id === 'custom') {
+    const baseUrl = await vscode.window.showInputBox({
+      title: 'Whycommit: custom endpoint',
+      prompt: 'Base URL of the OpenAI-compatible endpoint.',
+      value: config.baseUrl,
+      ignoreFocusOut: true,
+      placeHolder: 'https://example.com/v1',
+      validateInput: (input: string) =>
+        /^https?:\/\/.+/.test(input.trim())
+          ? undefined
+          : 'The base URL must start with http:// or https://',
+    });
+    if (baseUrl === undefined) {
+      return;
+    }
+    await section.update('baseUrl', baseUrl.trim(), vscode.ConfigurationTarget.Global);
+
+    const model = await vscode.window.showInputBox({
+      title: 'Whycommit: custom model',
+      prompt: 'Model id that the endpoint expects.',
+      value: config.model,
+      ignoreFocusOut: true,
+      placeHolder: 'my-model',
+    });
+    if (model === undefined) {
+      return;
+    }
+    await section.update('model', model.trim(), vscode.ConfigurationTarget.Global);
+  } else {
+    await section.update('baseUrl', preset.defaultBaseUrl, vscode.ConfigurationTarget.Global);
+    await section.update('model', preset.defaultModel, vscode.ConfigurationTarget.Global);
+  }
+
+  logger.info(`Switched the provider to "${preset.label}".`);
+  void vscode.window.showInformationMessage(
+    `Whycommit: the provider is now "${preset.label}".` +
+      (preset.requiresApiKey ? ' Store the API key with "Whycommit: Set API Key".' : ''),
   );
 }
 
@@ -303,4 +439,9 @@ function describeProviderError(error: unknown): string {
     }
   }
   return error instanceof Error ? error.message : String(error);
+}
+
+/** Exposed for the tests: resolves the settings of a provider preset. */
+export function describeConfig(config: WhycommitConfig): string {
+  return `${providerLabel(config.provider)} (${resolveModel(config)}) at ${resolveBaseUrl(config)}`;
 }

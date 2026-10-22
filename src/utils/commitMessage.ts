@@ -22,8 +22,9 @@ export function sanitizeCommitMessage(raw: string): string {
     text = quoted[1].trim();
   }
 
-  // Strip a leading "Commit message:" style preamble.
-  text = text.replace(/^(commit\s*message|commit)\s*:\s*/i, '');
+  // Strip a "Commit message:" style preamble. The pattern is deliberately
+  // narrow so that a legitimate subject such as "commit: add support" is kept.
+  text = text.replace(/^(?:here\s+(?:is|are)\s+the\s+)?commit\s*message\s*:\s*/i, '');
 
   // Collapse more than one blank line into a single blank line.
   text = text.replace(/\n{3,}/g, '\n\n');

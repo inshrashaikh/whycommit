@@ -23,6 +23,9 @@ const FILE_BLOCK_OVERHEAD = 16;
 /** Characters reserved for the "... [truncated ...] ..." marker. */
 const TRUNCATION_MARKER_RESERVE = 64;
 
+/** Characters reserved for the note about the files that did not fit at all. */
+const OMISSION_NOTE_RESERVE = 80;
+
 /** Files that only contain generated dependency metadata and never help a commit message. */
 const LOCKFILE_NAMES = new Set([
   'package-lock.json',
@@ -159,6 +162,11 @@ function truncateSection(body: string, maxChars: number): { text: string; trunca
     return { text: body, truncated: false };
   }
 
+  // The file did not get any budget at all, so only the file name is listed.
+  if (maxChars <= 0) {
+    return { text: '[diff omitted]', truncated: true };
+  }
+
   const slice = body.slice(0, maxChars);
   const lastNewline = slice.lastIndexOf('\n');
   const kept = lastNewline > 0 ? slice.slice(0, lastNewline) : slice;
@@ -195,7 +203,6 @@ export function processDiff(rawDiff: string, maxTokens: number): ProcessedDiff {
   const sections = splitDiffSections(rawDiff);
   const kept: Array<{ path: string; body: string }> = [];
   const skippedFiles: SkippedFile[] = [];
-  const truncatedFiles: string[] = [];
 
   let insertions = 0;
   let deletions = 0;
@@ -235,11 +242,46 @@ export function processDiff(rawDiff: string, maxTokens: number): ProcessedDiff {
   const charBudget = Math.max(1000, Math.floor(maxTokens * CHARS_PER_TOKEN));
 
   const totalBodyChars = kept.reduce((sum, item) => sum + item.body.length, 0);
-  const totalOverhead = kept.reduce(
-    (sum, item) => sum + FILE_BLOCK_OVERHEAD + item.path.length + TRUNCATION_MARKER_RESERVE,
+
+  // The overhead of one file block: the separator line plus the name of the
+  // file. `TRUNCATION_MARKER_RESERVE` is added on top of it for every file
+  // that has to be truncated.
+  const plainOverhead = kept.map((item) => FILE_BLOCK_OVERHEAD + item.path.length);
+  const totalPlainOverhead = plainOverhead.reduce((sum, value) => sum + value, 0);
+
+  // How many files can be listed at all? When a diff touches hundreds of
+  // files, even the file headers do not fit into the budget, so the surplus
+  // files are dropped and reported in the header.
+  const listingBudget = charBudget - header.length - OMISSION_NOTE_RESERVE;
+  let affordable = 0;
+  let listingOverhead = 0;
+
+  for (let index = 0; index < kept.length; index += 1) {
+    const cost = plainOverhead[index] + TRUNCATION_MARKER_RESERVE;
+    if (listingOverhead + cost > listingBudget && affordable > 0) {
+      break;
+    }
+    listingOverhead += cost;
+    affordable += 1;
+  }
+
+  const selected = kept.slice(0, affordable);
+  const omittedFiles = kept.slice(affordable);
+  const finalHeader =
+    omittedFiles.length > 0
+      ? `${header}\n# ${omittedFiles.length} more file(s) omitted, the diff is too large for the token budget`
+      : header;
+
+  const selectedBodyChars = selected.reduce((sum, item) => sum + item.body.length, 0);
+  const selectedPlainOverhead = selected.reduce(
+    (sum, _item, index) => sum + plainOverhead[index],
     0,
   );
-  const fitsIntoBudget = header.length + totalOverhead + totalBodyChars <= charBudget;
+  const selectedMarkerReserve = selected.length * TRUNCATION_MARKER_RESERVE;
+
+  const fitsIntoBudget =
+    omittedFiles.length === 0 &&
+    finalHeader.length + totalPlainOverhead + totalBodyChars <= charBudget;
 
   // Every file gets a share of the budget proportional to its size, with a
   // floor so that small files are never reduced to nothing. When the floor
@@ -247,13 +289,18 @@ export function processDiff(rawDiff: string, maxTokens: number): ProcessedDiff {
   let allowances: number[];
 
   if (fitsIntoBudget) {
-    allowances = kept.map((item) => item.body.length);
+    allowances = selected.map((item) => item.body.length);
   } else {
-    const contentBudget = Math.max(0, charBudget - header.length - totalOverhead);
+    const contentBudget = Math.max(
+      0,
+      charBudget - finalHeader.length - selectedPlainOverhead - selectedMarkerReserve,
+    );
 
-    allowances = kept.map((item) => {
+    allowances = selected.map((item) => {
       const proportional =
-        totalBodyChars > 0 ? Math.floor((contentBudget * item.body.length) / totalBodyChars) : 0;
+        selectedBodyChars > 0
+          ? Math.floor((contentBudget * item.body.length) / selectedBodyChars)
+          : 0;
       return Math.min(item.body.length, Math.max(MIN_FILE_CHARS, proportional));
     });
 
@@ -265,10 +312,11 @@ export function processDiff(rawDiff: string, maxTokens: number): ProcessedDiff {
   }
 
   const parts: string[] = [];
+  const truncatedFiles: string[] = [];
   let truncated = false;
 
-  for (let index = 0; index < kept.length; index += 1) {
-    const item = kept[index];
+  for (let index = 0; index < selected.length; index += 1) {
+    const item = selected[index];
     const result = truncateSection(item.body, allowances[index]);
     if (result.truncated) {
       truncated = true;
@@ -278,16 +326,16 @@ export function processDiff(rawDiff: string, maxTokens: number): ProcessedDiff {
     parts.push(`--- FILE: ${item.path} ---\n${result.text}`);
   }
 
-  const text = `${header}\n${parts.join('\n\n')}`.trim();
+  const text = `${finalHeader}\n${parts.join('\n\n')}`.trim();
 
   return {
     text,
     stats,
-    includedFiles: kept.map((item) => item.path),
+    includedFiles: selected.map((item) => item.path),
     skippedFiles,
     truncatedFiles,
     estimatedTokens: Math.ceil(text.length / CHARS_PER_TOKEN),
-    truncated,
+    truncated: truncated || omittedFiles.length > 0,
   };
 }
 
