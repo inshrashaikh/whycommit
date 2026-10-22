@@ -9,6 +9,7 @@ scripts/**
 tsconfig.json
 vitest.config.ts
 .securityscanignore
+RELEASE.md
 .gitignore
 .eslintrc.json
 .eslintignore

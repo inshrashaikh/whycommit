@@ -185,6 +185,8 @@ npm run package    # build and produce a .vsix
 npm run security:scan  # scan the repository and the git history for secrets
 ```
 
+See [RELEASE.md](./RELEASE.md) for the manual steps of a Marketplace release.
+
 ### Running the extension (F5)
 
 1. Open this folder in VS Code.
