@@ -6,7 +6,13 @@ import { extname } from 'path';
 
 const DOC_EXTS = new Set(['.md', '.mdx', '.rst', '.txt']);
 const TEST_PATTERNS = [/\.test\./, /\.spec\./, /\/test\//, /\/tests\//, /__tests__\//];
-const CI_PATTERNS = [/\.github\/workflows\//, /\.gitlab-ci/, /\.circleci\//, /azure-pipelines/, /Jenkinsfile/];
+const CI_PATTERNS = [
+  /\.github\/workflows\//,
+  /\.gitlab-ci/,
+  /\.circleci\//,
+  /azure-pipelines/,
+  /Jenkinsfile/,
+];
 const BUILD_PATTERNS = [
   /package\.json$/,
   /package-lock\.json$/,
@@ -29,7 +35,15 @@ const BUILD_PATTERNS = [
   /Dockerfile$/,
   /docker-compose/,
 ];
-const CONFIG_PATTERNS = [/\.gitignore$/, /\.npmignore$/, /\.eslintrc/, /\.prettierrc/, /\.editorconfig$/, /\.vscodeignore$/, /config\//];
+const CONFIG_PATTERNS = [
+  /\.gitignore$/,
+  /\.npmignore$/,
+  /\.eslintrc/,
+  /\.prettierrc/,
+  /\.editorconfig$/,
+  /\.vscodeignore$/,
+  /config\//,
+];
 
 function matchesAny(path: string, patterns: RegExp[]): boolean {
   const normalized = path.replace(/\\/g, '/');
@@ -70,7 +84,11 @@ function looksLikeConfig(path: string): boolean {
 
 function hasFixKeywords(added: string[], removed: string[]): boolean {
   const text = [...added, ...removed].join(' ').toLowerCase();
-  if (/(^|\b)(fix|bug|error|crash|regression|null check|null-pointer|undefined|nullish)(\b|$)/.test(text)) {
+  if (
+    /(^|\b)(fix|bug|error|crash|regression|null check|null-pointer|undefined|nullish)(\b|$)/.test(
+      text,
+    )
+  ) {
     return true;
   }
   if (/\bcatch\b.*\berror\b|\bif\s*\(!|===\s*null|==\s*null|\?\.|\?\?/.test(text)) {
@@ -94,7 +112,9 @@ function looksLikeRefactor(added: string[], removed: string[]): boolean {
 function hasOnlyWhitespace(added: string[], removed: string[]): boolean {
   const addedNonWs = added.filter((l) => l.trim().length > 0);
   const removedNonWs = removed.filter((l) => l.trim().length > 0);
-  return addedNonWs.length === 0 && removedNonWs.length === 0 && (added.length > 0 || removed.length > 0);
+  return (
+    addedNonWs.length === 0 && removedNonWs.length === 0 && (added.length > 0 || removed.length > 0)
+  );
 }
 
 export function classifyFile(file: FileChange): CommitType {
@@ -155,6 +175,15 @@ export function detectScope(files: FileChange[]): string | undefined {
     return undefined;
   }
 
+  // Files at the repository root have no meaningful scope.
+  const allInRoot = files.every((file) => {
+    const normalized = file.path.replace(/\\/g, '/').replace(/^\.\//, '');
+    return !normalized.includes('/');
+  });
+  if (allInRoot) {
+    return undefined;
+  }
+
   const folders = new Set<string>();
   for (const file of files) {
     const normalized = file.path.replace(/\\/g, '/');
@@ -186,9 +215,20 @@ export function selectPrimaryType(files: FileChange[]): CommitType {
   }
 
   // Priority order for mixed changes
-  const priority: CommitType[] = ['feat', 'fix', 'perf', 'refactor', 'docs', 'test', 'build', 'ci', 'style', 'chore'];
+  const priority: CommitType[] = [
+    'feat',
+    'fix',
+    'perf',
+    'refactor',
+    'docs',
+    'test',
+    'build',
+    'ci',
+    'style',
+    'chore',
+  ];
   const types = files.map((f) => classifyFile(f));
-  
+
   // If all same type, return it
   const unique = Array.from(new Set(types));
   if (unique.length === 1) {
@@ -204,9 +244,15 @@ export function selectPrimaryType(files: FileChange[]): CommitType {
   }
 
   // For mixed changes, prefer feat/fix over docs/chore
-  if (types.includes('feat')) return 'feat';
-  if (types.includes('fix')) return 'fix';
-  if (types.includes('refactor')) return 'refactor';
-  
+  if (types.includes('feat')) {
+    return 'feat';
+  }
+  if (types.includes('fix')) {
+    return 'fix';
+  }
+  if (types.includes('refactor')) {
+    return 'refactor';
+  }
+
   return types[0] || 'chore';
 }

@@ -1,7 +1,15 @@
 // Copyright (c) 2026 Shaikh Inshra. All rights reserved.
 // Proprietary - see LICENSE. No copying, modification, distribution or reuse permitted.
 
-import type { CommitType, CommitrcRules, FileChange, OutputLanguage, RuleEngineInput, RuleEngineOutput } from './types';
+import type {
+  CommitType,
+  CommitrcRules,
+  FileChange,
+  OutputLanguage,
+  RuleEngineInput,
+  RuleEngineOutput,
+  SymbolInfo,
+} from './types';
 import { basename, dirname } from 'path';
 import { extractSymbols } from './symbolParser';
 
@@ -15,6 +23,31 @@ function getDirname(path: string): string {
   return dir === '.' ? '' : dir.split('/').pop() || '';
 }
 
+/** Formats the extracted symbols and wraps their names in backticks. */
+function formatSymbols(symbols: SymbolInfo[]): string {
+  const selected = symbols.slice(0, 2);
+  const names = selected.map((symbol) => '`' + symbol.name + '`').join(' and ');
+  if (selected.length === 0) {
+    return names;
+  }
+
+  const kinds = new Set(selected.map((symbol) => symbol.kind));
+  if (kinds.size === 1) {
+    const kind = selected[0].kind;
+    if (kind === 'function') {
+      return names + (selected.length > 1 ? ' functions' : ' function');
+    }
+    if (kind === 'method') {
+      return names + (selected.length > 1 ? ' methods' : ' method');
+    }
+    if (kind === 'class' || kind === 'component') {
+      return names + (selected.length > 1 ? ' classes' : ' class');
+    }
+  }
+
+  return names;
+}
+
 function truncateToLength(text: string, maxLength: number): string {
   if (text.length <= maxLength) {
     return text;
@@ -22,18 +55,35 @@ function truncateToLength(text: string, maxLength: number): string {
   return text.slice(0, maxLength - 3) + '...';
 }
 
-function applyCommitrc(subject: string, type: CommitType, scope: string | undefined, commitrc: CommitrcRules | null | undefined): string {
+function applyCommitrc(
+  subject: string,
+  type: CommitType,
+  scope: string | undefined,
+  commitrc: CommitrcRules | null | undefined,
+): string {
   if (!commitrc) {
     return subject;
   }
 
   let result = subject;
-  if (commitrc.allowedTypes && commitrc.allowedTypes.length > 0 && !commitrc.allowedTypes.includes(type)) {
+  if (
+    commitrc.allowedTypes &&
+    commitrc.allowedTypes.length > 0 &&
+    !commitrc.allowedTypes.includes(type)
+  ) {
     const fallback = commitrc.allowedTypes[0];
     result = result.replace(new RegExp('^' + type + ':'), fallback + ':');
   }
-  if (scope && commitrc.allowedScopes && commitrc.allowedScopes.length > 0 && !commitrc.allowedScopes.includes(scope)) {
-    result = result.replace(new RegExp('^([a-z]+)\\(' + scope.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\):'), '$1:');
+  if (
+    scope &&
+    commitrc.allowedScopes &&
+    commitrc.allowedScopes.length > 0 &&
+    !commitrc.allowedScopes.includes(scope)
+  ) {
+    result = result.replace(
+      new RegExp('^([a-z]+)\\(' + scope.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\):'),
+      '$1:',
+    );
   }
   if (commitrc.maxSubjectLength && result.length > commitrc.maxSubjectLength) {
     result = truncateToLength(result, commitrc.maxSubjectLength);
@@ -41,53 +91,65 @@ function applyCommitrc(subject: string, type: CommitType, scope: string | undefi
   return result;
 }
 
-function buildSubjectEnglish(type: CommitType, scope: string | undefined, files: FileChange[]): string {
+function buildSubjectEnglish(
+  type: CommitType,
+  scope: string | undefined,
+  files: FileChange[],
+): string {
   const mainFile = files[0];
   if (files.length === 1) {
     const file = mainFile;
     const name = getBasename(file.path);
     const dir = getDirname(file.path);
+    const nameLabel = '`' + name + '`';
+    const dirLabel = '`' + (dir || name) + '`';
     const symbols = extractSymbols(file.path, [...file.addedLines, ...file.removedLines]);
 
     if (type === 'feat') {
       if (symbols.length > 0) {
-        const symbolNames = symbols.slice(0, 2).map((s) => s.name).join(' and ');
+        const symbolNames = formatSymbols(symbols);
         if (file.status === 'added') {
           return scope ? 'feat(' + scope + '): add ' + symbolNames : 'feat: add ' + symbolNames;
         }
         return scope ? 'feat(' + scope + '): update ' + symbolNames : 'feat: update ' + symbolNames;
       }
       if (file.status === 'added') {
-        return scope ? 'feat(' + scope + '): add ' + name : 'feat: add ' + name;
+        return scope ? 'feat(' + scope + '): add ' + nameLabel : 'feat: add ' + nameLabel;
       }
-      return scope ? 'feat(' + scope + '): update ' + name : 'feat: update ' + name;
+      return scope ? 'feat(' + scope + '): update ' + nameLabel : 'feat: update ' + nameLabel;
     }
 
     if (type === 'fix') {
       if (symbols.length > 0) {
-        const symbolNames = symbols.slice(0, 2).map((s) => s.name).join(' and ');
+        const symbolNames = formatSymbols(symbols);
         return scope ? 'fix(' + scope + '): fix ' + symbolNames : 'fix: fix ' + symbolNames;
       }
-      return scope ? 'fix(' + scope + '): fix ' + name : 'fix: fix ' + name;
+      return scope ? 'fix(' + scope + '): fix ' + nameLabel : 'fix: fix ' + nameLabel;
     }
 
     if (type === 'docs') {
-      return scope ? 'docs(' + scope + '): update ' + name : 'docs: update ' + name;
+      return scope ? 'docs(' + scope + '): update ' + nameLabel : 'docs: update ' + nameLabel;
     }
 
     if (type === 'test') {
       if (file.status === 'added') {
-        return scope ? 'test(' + scope + '): add tests for ' + (dir || name) : 'test: add tests for ' + (dir || name);
+        return scope
+          ? 'test(' + scope + '): add tests for ' + dirLabel
+          : 'test: add tests for ' + dirLabel;
       }
       return scope ? 'test(' + scope + '): update tests' : 'test: update tests';
     }
 
     if (type === 'refactor') {
       if (symbols.length > 0) {
-        const symbolNames = symbols.slice(0, 2).map((s) => s.name).join(' and ');
-        return scope ? 'refactor(' + scope + '): refactor ' + symbolNames : 'refactor: refactor ' + symbolNames;
+        const symbolNames = formatSymbols(symbols);
+        return scope
+          ? 'refactor(' + scope + '): refactor ' + symbolNames
+          : 'refactor: refactor ' + symbolNames;
       }
-      return scope ? 'refactor(' + scope + '): refactor ' + name : 'refactor: refactor ' + name;
+      return scope
+        ? 'refactor(' + scope + '): refactor ' + nameLabel
+        : 'refactor: refactor ' + nameLabel;
     }
 
     if (type === 'style') {
@@ -102,13 +164,15 @@ function buildSubjectEnglish(type: CommitType, scope: string | undefined, files:
       return scope ? 'build(' + scope + '): update build config' : 'build: update build config';
     }
 
-    return scope ? type + '(' + scope + '): update ' + name : type + ': update ' + name;
+    return scope ? type + '(' + scope + '): update ' + nameLabel : type + ': update ' + nameLabel;
   }
 
   if (type === 'feat') {
     const newFiles = files.filter((f) => f.status === 'added').length;
     if (newFiles === files.length && files.length > 1) {
-      return scope ? 'feat(' + scope + '): add ' + files.length + ' new files' : 'feat: add ' + files.length + ' new files';
+      return scope
+        ? 'feat(' + scope + '): add ' + files.length + ' new files'
+        : 'feat: add ' + files.length + ' new files';
     }
     return scope ? 'feat(' + scope + '): add features' : 'feat: add features';
   }
@@ -132,39 +196,44 @@ function buildSubjectEnglish(type: CommitType, scope: string | undefined, files:
   return scope ? type + '(' + scope + '): update multiple files' : type + ': update multiple files';
 }
 
-function buildSubjectHinglish(type: CommitType, scope: string | undefined, files: FileChange[]): string {
+function buildSubjectHinglish(
+  type: CommitType,
+  scope: string | undefined,
+  files: FileChange[],
+): string {
   const mainFile = files[0];
   void mainFile;
   void files;
   if (files.length === 1) {
     const file = mainFile;
     const name = getBasename(file.path);
+    const nameLabel = '`' + name + '`';
     const symbols = extractSymbols(file.path, [...file.addedLines, ...file.removedLines]);
 
     if (type === 'feat') {
       if (symbols.length > 0) {
-        const symbolNames = symbols.slice(0, 2).map((s) => s.name).join(' and ');
+        const symbolNames = formatSymbols(symbols);
         if (file.status === 'added') {
           return scope ? 'feat(' + scope + '): add ' + symbolNames : 'feat: add ' + symbolNames;
         }
         return scope ? 'feat(' + scope + '): update ' + symbolNames : 'feat: update ' + symbolNames;
       }
       if (file.status === 'added') {
-        return scope ? 'feat(' + scope + '): add ' + name : 'feat: add ' + name;
+        return scope ? 'feat(' + scope + '): add ' + nameLabel : 'feat: add ' + nameLabel;
       }
-      return scope ? 'feat(' + scope + '): update ' + name : 'feat: update ' + name;
+      return scope ? 'feat(' + scope + '): update ' + nameLabel : 'feat: update ' + nameLabel;
     }
 
     if (type === 'fix') {
       if (symbols.length > 0) {
-        const symbolNames = symbols.slice(0, 2).map((s) => s.name).join(' and ');
+        const symbolNames = formatSymbols(symbols);
         return scope ? 'fix(' + scope + '): fix ' + symbolNames : 'fix: fix ' + symbolNames;
       }
-      return scope ? 'fix(' + scope + '): fix ' + name : 'fix: fix ' + name;
+      return scope ? 'fix(' + scope + '): fix ' + nameLabel : 'fix: fix ' + nameLabel;
     }
 
     if (type === 'docs') {
-      return scope ? 'docs(' + scope + '): update ' + name : 'docs: update ' + name;
+      return scope ? 'docs(' + scope + '): update ' + nameLabel : 'docs: update ' + nameLabel;
     }
 
     if (type === 'test') {
@@ -175,7 +244,7 @@ function buildSubjectHinglish(type: CommitType, scope: string | undefined, files
       return scope ? 'refactor(' + scope + '): refactor code' : 'refactor: refactor code';
     }
 
-    return scope ? type + '(' + scope + '): update ' + name : type + ': update ' + name;
+    return scope ? type + '(' + scope + '): update ' + nameLabel : type + ': update ' + nameLabel;
   }
 
   if (type === 'feat') {
@@ -194,7 +263,11 @@ function buildSubjectHinglish(type: CommitType, scope: string | undefined, files
   return scope ? type + '(' + scope + '): update multiple files' : type + ': update multiple files';
 }
 
-function buildBody(files: FileChange[], why?: string, _language: OutputLanguage = 'english'): string {
+function buildBody(
+  files: FileChange[],
+  why?: string,
+  _language: OutputLanguage = 'english',
+): string {
   const lines: string[] = [];
   for (const file of files) {
     const name = getBasename(file.path);
@@ -216,7 +289,11 @@ function buildBody(files: FileChange[], why?: string, _language: OutputLanguage 
   return lines.join('\n');
 }
 
-export function buildMessage(input: RuleEngineInput, type: CommitType, scope: string | undefined): RuleEngineOutput {
+export function buildMessage(
+  input: RuleEngineInput,
+  type: CommitType,
+  scope: string | undefined,
+): RuleEngineOutput {
   let subject: string;
   if (input.language === 'hinglish') {
     subject = buildSubjectHinglish(type, scope, input.files);

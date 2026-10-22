@@ -15,7 +15,16 @@ index 123..456 100644
  # Hello
 +World
 `;
-    const result = runRuleEngine({ rawDiff: diff, files: parseStagedDiff(diff), branch: 'main', recentCommits: [], language: 'english', why: undefined, commitrc: null, repoStyle: null });
+    const result = runRuleEngine({
+      rawDiff: diff,
+      files: parseStagedDiff(diff),
+      branch: 'main',
+      recentCommits: [],
+      language: 'english',
+      why: undefined,
+      commitrc: null,
+      repoStyle: null,
+    });
     expect(result.type).toBe('docs');
     expect(result.subject).toMatch(/^docs/);
   });
@@ -29,7 +38,16 @@ index 0000..1234
 @@ -0,0 +1 @@
 +test('x', ()=>{})
 `;
-    const result = runRuleEngine({ rawDiff: diff, files: parseStagedDiff(diff), branch: 'main', recentCommits: [], language: 'english', why: undefined, commitrc: null, repoStyle: null });
+    const result = runRuleEngine({
+      rawDiff: diff,
+      files: parseStagedDiff(diff),
+      branch: 'main',
+      recentCommits: [],
+      language: 'english',
+      why: undefined,
+      commitrc: null,
+      repoStyle: null,
+    });
     expect(result.type).toBe('test');
   });
 
@@ -42,7 +60,16 @@ index 0000..1234
 @@ -0,0 +5 @@
 +export function login() {}
 `;
-    const result = runRuleEngine({ rawDiff: diff, files: parseStagedDiff(diff), branch: 'main', recentCommits: [], language: 'english', why: undefined, commitrc: null, repoStyle: null });
+    const result = runRuleEngine({
+      rawDiff: diff,
+      files: parseStagedDiff(diff),
+      branch: 'main',
+      recentCommits: [],
+      language: 'english',
+      why: undefined,
+      commitrc: null,
+      repoStyle: null,
+    });
     expect(result.type).toBe('feat');
     expect(result.subject.length).toBeLessThanOrEqual(72);
   });
@@ -56,7 +83,16 @@ index 123..456 100644
 -function login() { return null; }
 +function login() { if(!user) return null; }
 `;
-    const result = runRuleEngine({ rawDiff: diff, files: parseStagedDiff(diff), branch: 'main', recentCommits: [], language: 'english', why: undefined, commitrc: null, repoStyle: null });
+    const result = runRuleEngine({
+      rawDiff: diff,
+      files: parseStagedDiff(diff),
+      branch: 'main',
+      recentCommits: [],
+      language: 'english',
+      why: undefined,
+      commitrc: null,
+      repoStyle: null,
+    });
     expect(result.type).toBe('fix');
   });
 
@@ -71,7 +107,16 @@ index 123..456 100644
 +const a = 1;
 +const b = 3;
 `;
-    const result = runRuleEngine({ rawDiff: diff, files: parseStagedDiff(diff), branch: 'main', recentCommits: [], language: 'english', why: undefined, commitrc: null, repoStyle: null });
+    const result = runRuleEngine({
+      rawDiff: diff,
+      files: parseStagedDiff(diff),
+      branch: 'main',
+      recentCommits: [],
+      language: 'english',
+      why: undefined,
+      commitrc: null,
+      repoStyle: null,
+    });
     expect(result.subject).toBeTruthy();
   });
 
@@ -84,7 +129,16 @@ index 123..456 100644
 -{"version":"1.0.0"}
 +{"version":"1.0.1"}
 `;
-    const result = runRuleEngine({ rawDiff: diff, files: parseStagedDiff(diff), branch: 'main', recentCommits: [], language: 'english', why: undefined, commitrc: null, repoStyle: null });
+    const result = runRuleEngine({
+      rawDiff: diff,
+      files: parseStagedDiff(diff),
+      branch: 'main',
+      recentCommits: [],
+      language: 'english',
+      why: undefined,
+      commitrc: null,
+      repoStyle: null,
+    });
     expect(result.type).toBeTruthy();
   });
 
@@ -104,7 +158,16 @@ index 0000..1234
 @@ -0,0 +1 @@
 +export function util(){}
 `;
-    const result = runRuleEngine({ rawDiff: diff, files: parseStagedDiff(diff), branch: 'main', recentCommits: [], language: 'english', why: undefined, commitrc: null, repoStyle: null });
+    const result = runRuleEngine({
+      rawDiff: diff,
+      files: parseStagedDiff(diff),
+      branch: 'main',
+      recentCommits: [],
+      language: 'english',
+      why: undefined,
+      commitrc: null,
+      repoStyle: null,
+    });
     expect(result.subject).toBeTruthy();
   });
 
@@ -114,13 +177,110 @@ new file mode 100644
 index 0000..1234
 Binary files /dev/null and b/image.png differ
 `;
-    const result = runRuleEngine({ rawDiff: diff, files: parseStagedDiff(diff), branch: 'main', recentCommits: [], language: 'english', why: undefined, commitrc: null, repoStyle: null });
+    const result = runRuleEngine({
+      rawDiff: diff,
+      files: parseStagedDiff(diff),
+      branch: 'main',
+      recentCommits: [],
+      language: 'english',
+      why: undefined,
+      commitrc: null,
+      repoStyle: null,
+    });
     expect(result.subject).toBeTruthy();
   });
 
   it('handles empty diff', () => {
-    const result = runRuleEngine({ rawDiff: '', files: [], branch: 'main', recentCommits: [], language: 'english', why: undefined, commitrc: null, repoStyle: null });
+    const result = runRuleEngine({
+      rawDiff: '',
+      files: [],
+      branch: 'main',
+      recentCommits: [],
+      language: 'english',
+      why: undefined,
+      commitrc: null,
+      repoStyle: null,
+    });
     expect(result.subject).toBeTruthy();
+  });
+
+  it('wraps function names in backticks in the subject', () => {
+    const diff = `diff --git a/src/math.ts b/src/math.ts
+new file mode 100644
+index 0000..1234
+--- /dev/null
++++ b/src/math.ts
+@@ -0,0 +1,2 @@
++export function add(a: number, b: number) { return a + b; }
++export function greet(name: string) { return 'hi ' + name; }
+`;
+    const result = runRuleEngine({
+      rawDiff: diff,
+      files: parseStagedDiff(diff),
+      branch: 'main',
+      recentCommits: [],
+      language: 'english',
+      why: undefined,
+      commitrc: null,
+      repoStyle: null,
+    });
+    expect(result.subject).toContain('`add`');
+    expect(result.subject).toContain('`greet`');
+  });
+
+  it('wraps file names in backticks in the subject', () => {
+    const diff = `diff --git a/README.md b/README.md
+new file mode 100644
+index 0000..1234
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1 @@
++# Whycommit
+`;
+    const result = runRuleEngine({
+      rawDiff: diff,
+      files: parseStagedDiff(diff),
+      branch: 'main',
+      recentCommits: [],
+      language: 'english',
+      why: undefined,
+      commitrc: null,
+      repoStyle: null,
+    });
+    expect(result.subject).toContain('`README.md`');
+  });
+
+  it('omits the scope when all changed files are in the repository root', () => {
+    const diff = `diff --git a/index.ts b/index.ts
+new file mode 100644
+index 0000..1234
+--- /dev/null
++++ b/index.ts
+@@ -0,0 +1,4 @@
++export function main() {
++  return 1;
++}
++export const extra = 2;
+diff --git a/README.md b/README.md
+new file mode 100644
+index 0000..1234
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1 @@
++# Whycommit
+`;
+    const result = runRuleEngine({
+      rawDiff: diff,
+      files: parseStagedDiff(diff),
+      branch: 'main',
+      recentCommits: [],
+      language: 'english',
+      why: undefined,
+      commitrc: null,
+      repoStyle: null,
+    });
+    expect(result.scope).toBeUndefined();
+    expect(result.subject).not.toMatch(/^[a-z]+\(/);
   });
 
   it('supports Hinglish output and Why', () => {
@@ -132,7 +292,16 @@ index 0000..1234
 @@ -0,0 +1 @@
 +export function app(){}
 `;
-    const result = runRuleEngine({ rawDiff: diff, files: parseStagedDiff(diff), branch: 'main', recentCommits: [], language: 'hinglish', why: 'better UX', commitrc: null, repoStyle: null });
+    const result = runRuleEngine({
+      rawDiff: diff,
+      files: parseStagedDiff(diff),
+      branch: 'main',
+      recentCommits: [],
+      language: 'hinglish',
+      why: 'better UX',
+      commitrc: null,
+      repoStyle: null,
+    });
     expect(result.fullMessage).toContain('Why: better UX');
   });
 });

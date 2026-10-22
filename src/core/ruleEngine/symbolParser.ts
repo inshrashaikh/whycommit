@@ -4,23 +4,82 @@
 import type { SymbolInfo } from './types';
 
 const FUNCTION_PATTERNS: Array<{ language: string; regex: RegExp; kind: SymbolInfo['kind'] }> = [
-  { language: 'javascript', regex: /(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][A-Za-z0-9_$]*)/g, kind: 'function' },
-  { language: 'typescript', regex: /(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][A-Za-z0-9_$]*)/g, kind: 'function' },
-  { language: 'javascript', regex: /(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*(?:async\s*)?\(/g, kind: 'function' },
-  { language: 'typescript', regex: /(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*(?:async\s*)?\(/g, kind: 'function' },
-  { language: 'javascript', regex: /(?:export\s+)?class\s+([A-Za-z_$][A-Za-z0-9_$]*)/g, kind: 'class' },
-  { language: 'typescript', regex: /(?:export\s+)?class\s+([A-Za-z_$][A-Za-z0-9_$]*)/g, kind: 'class' },
-  { language: 'typescript', regex: /(?:export\s+)?(?:interface|type)\s+([A-Za-z_$][A-Za-z0-9_$]*)/g, kind: 'export' },
-  { language: 'python', regex: /^(?:async\s+)?def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/gm, kind: 'function' },
+  {
+    language: 'javascript',
+    regex: /(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][A-Za-z0-9_$]*)/g,
+    kind: 'function',
+  },
+  {
+    language: 'typescript',
+    regex: /(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][A-Za-z0-9_$]*)/g,
+    kind: 'function',
+  },
+  {
+    language: 'javascript',
+    regex: /(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*(?:async\s*)?\(/g,
+    kind: 'function',
+  },
+  {
+    language: 'typescript',
+    regex: /(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*(?:async\s*)?\(/g,
+    kind: 'function',
+  },
+  {
+    language: 'javascript',
+    regex: /(?:export\s+)?class\s+([A-Za-z_$][A-Za-z0-9_$]*)/g,
+    kind: 'class',
+  },
+  {
+    language: 'typescript',
+    regex: /(?:export\s+)?class\s+([A-Za-z_$][A-Za-z0-9_$]*)/g,
+    kind: 'class',
+  },
+  {
+    language: 'typescript',
+    regex: /(?:export\s+)?(?:interface|type)\s+([A-Za-z_$][A-Za-z0-9_$]*)/g,
+    kind: 'export',
+  },
+  {
+    language: 'python',
+    regex: /^(?:async\s+)?def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/gm,
+    kind: 'function',
+  },
   { language: 'python', regex: /^class\s+([A-Za-z_][A-Za-z0-9_]*)/gm, kind: 'class' },
-  { language: 'java', regex: /(?:public|private|protected)?\s*(?:static\s+)?(?:final\s+)?[A-Za-z<>\[\]]+\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/g, kind: 'method' },
-  { language: 'java', regex: /(?:public|private|protected)\s+class\s+([A-Za-z_][A-Za-z0-9_]*)/g, kind: 'class' },
-  { language: 'csharp', regex: /(?:public|private|protected|internal)\s+(?:static\s+)?[A-Za-z<>\[\],\s]+\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/g, kind: 'method' },
-  { language: 'csharp', regex: /(?:public|private|protected|internal)\s+class\s+([A-Za-z_][A-Za-z0-9_]*)/g, kind: 'class' },
-  { language: 'go', regex: /^func\s+(?:\([^)]+\)\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*\(/gm, kind: 'function' },
+  {
+    language: 'java',
+    regex:
+      /(?:public|private|protected)?\s*(?:static\s+)?(?:final\s+)?[A-Za-z<>[\]]+\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/g,
+    kind: 'method',
+  },
+  {
+    language: 'java',
+    regex: /(?:public|private|protected)\s+class\s+([A-Za-z_][A-Za-z0-9_]*)/g,
+    kind: 'class',
+  },
+  {
+    language: 'csharp',
+    regex:
+      /(?:public|private|protected|internal)\s+(?:static\s+)?[A-Za-z<>[\]\s,]+\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/g,
+    kind: 'method',
+  },
+  {
+    language: 'csharp',
+    regex: /(?:public|private|protected|internal)\s+class\s+([A-Za-z_][A-Za-z0-9_]*)/g,
+    kind: 'class',
+  },
+  {
+    language: 'go',
+    regex: /^func\s+(?:\([^)]+\)\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*\(/gm,
+    kind: 'function',
+  },
   { language: 'go', regex: /^type\s+([A-Za-z_][A-Za-z0-9_]*)\s+struct/gm, kind: 'class' },
   { language: 'go', regex: /^type\s+([A-Za-z_][A-Za-z0-9_]*)\s+interface/gm, kind: 'export' },
-  { language: 'php', regex: /(?:public|private|protected)?\s*(?:static\s+)?function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/g, kind: 'function' },
+  {
+    language: 'php',
+    regex:
+      /(?:public|private|protected)?\s*(?:static\s+)?function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/g,
+    kind: 'function',
+  },
   { language: 'php', regex: /class\s+([A-Za-z_][A-Za-z0-9_]*)/g, kind: 'class' },
 ];
 
@@ -32,13 +91,32 @@ const COMPONENT_PATTERNS = [
 
 function detectLanguage(path: string): string {
   const lower = path.toLowerCase();
-  if (lower.endsWith('.ts') || lower.endsWith('.tsx')) return 'typescript';
-  if (lower.endsWith('.js') || lower.endsWith('.jsx') || lower.endsWith('.mjs') || lower.endsWith('.cjs')) return 'javascript';
-  if (lower.endsWith('.py')) return 'python';
-  if (lower.endsWith('.java')) return 'java';
-  if (lower.endsWith('.cs')) return 'csharp';
-  if (lower.endsWith('.go')) return 'go';
-  if (lower.endsWith('.php')) return 'php';
+  if (lower.endsWith('.ts') || lower.endsWith('.tsx')) {
+    return 'typescript';
+  }
+  if (
+    lower.endsWith('.js') ||
+    lower.endsWith('.jsx') ||
+    lower.endsWith('.mjs') ||
+    lower.endsWith('.cjs')
+  ) {
+    return 'javascript';
+  }
+  if (lower.endsWith('.py')) {
+    return 'python';
+  }
+  if (lower.endsWith('.java')) {
+    return 'java';
+  }
+  if (lower.endsWith('.cs')) {
+    return 'csharp';
+  }
+  if (lower.endsWith('.go')) {
+    return 'go';
+  }
+  if (lower.endsWith('.php')) {
+    return 'php';
+  }
   return 'unknown';
 }
 
