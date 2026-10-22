@@ -24,6 +24,8 @@ import { ScmButton } from './ui/scmButton';
 import { StatusBar } from './ui/statusBar';
 import { sanitizeCommitMessage } from './utils/commitMessage';
 import { Logger } from './utils/logger';
+import { RuleBasedProvider } from './llm/ruleBased';
+import { VsCodeLmProvider } from './llm/vscodeLm';
 
 interface Dependencies {
   gitService: GitService;
@@ -117,15 +119,78 @@ async function generateCommitMessage(
   }
 
   const config = getConfig();
-  const preset = PROVIDER_PRESETS[config.provider];
+  let effectiveProvider = config.provider;
+  
+  // Auto resolution
+  if (effectiveProvider === 'auto') {
+    // Check for API keys in common providers or Ollama
+    const ollamaKey = await context.secrets.get(secretKeyFor('ollama'));
+    const anthropicKey = await context.secrets.get(secretKeyFor('anthropic'));
+    const hasApiKey = !!(ollamaKey || anthropicKey || (await context.secrets.get(secretKeyFor('openai'))));
+    // Try Ollama if available
+    try {
+      const response = await fetch('http://localhost:11434/api/tags');
+      if (response.ok) {
+        effectiveProvider = 'ollama';
+      } else if (hasApiKey) {
+        effectiveProvider = config.provider === 'auto' ? 'anthropic' : config.provider; // fallback
+      } else {
+        // Try VS Code LM
+        try {
+          const models = await vscode.lm.selectChatModels({ vendor: 'copilot' });
+          if (models.length > 0) {
+            effectiveProvider = 'vscode-lm';
+          } else {
+            effectiveProvider = 'rulebased';
+          }
+        } catch {
+          effectiveProvider = 'rulebased';
+        }
+      }
+    } catch {
+      try {
+        const models = await vscode.lm.selectChatModels({ vendor: 'copilot' });
+        if (models.length > 0) {
+          effectiveProvider = 'vscode-lm';
+        } else if (hasApiKey) {
+          effectiveProvider = 'anthropic';
+        } else {
+          effectiveProvider = 'rulebased';
+        }
+      } catch {
+        effectiveProvider = 'rulebased';
+      }
+    }
+  }
+  
+  const preset = PROVIDER_PRESETS[effectiveProvider as keyof typeof PROVIDER_PRESETS] || PROVIDER_PRESETS[config.provider];
+
+  // First-run experience
+  const firstRunKey = 'whycommit.firstRunShown';
+  if (!(context.globalState.get(firstRunKey) as boolean)) {
+    void vscode.window.showInformationMessage(
+      'Whycommit works offline. Add an API key or Ollama for smarter messages.',
+      'Set API Key',
+      'Use Ollama',
+    ).then((action) => {
+      if (action === 'Set API Key') {
+        void setApiKey(context, logger);
+      } else if (action === 'Use Ollama') {
+        void vscode.env.openExternal(vscode.Uri.parse('https://ollama.ai'));
+      }
+    });
+    await context.globalState.update(firstRunKey, true);
+  }
 
   // 0. The very first cloud request is announced to the user.
-  await privacyNotice.showIfNeeded(config.provider);
+  if (effectiveProvider !== 'rulebased' && effectiveProvider !== 'vscode-lm') {
+    await privacyNotice.showIfNeeded(effectiveProvider);
+  }
 
   // 1. The API key lives in the SecretStorage, never in the settings.
-  const apiKey = await context.secrets.get(secretKeyFor(config.provider));
+  const apiKey = await context.secrets.get(secretKeyFor(effectiveProvider));
   if (preset.requiresApiKey && !apiKey) {
-    logger.warn(`No ${config.provider} API key is stored in the SecretStorage.`);
+    logger.warn(`No ${effectiveProvider} API key is stored in the SecretStorage.`);
     const action = await vscode.window.showWarningMessage(
       `Whycommit: no ${preset.label} API key is stored yet.`,
       'Set API Key',
@@ -205,7 +270,19 @@ async function generateCommitMessage(
   });
 
   // 6. Call the provider.
-  const provider = createProvider(config.provider);
+  let provider: any;
+  try {
+    if (effectiveProvider === 'rulebased') {
+      provider = new RuleBasedProvider();
+    } else if (effectiveProvider === 'vscode-lm') {
+      provider = new VsCodeLmProvider();
+    } else {
+      provider = createProvider(effectiveProvider as any);
+    }
+  } catch {
+    provider = new RuleBasedProvider();
+  }
+  
   statusBar.showBusy();
 
   try {
@@ -222,8 +299,8 @@ async function generateCommitMessage(
           return await withRetry(
             () =>
               provider.generate(prompt, {
-                model: resolveModel(config),
-                baseUrl: resolveBaseUrl(config),
+                model: resolveModel({ ...config, provider: effectiveProvider as any }),
+                baseUrl: resolveBaseUrl({ ...config, provider: effectiveProvider as any }),
                 apiKey,
                 temperature: config.temperature,
                 maxOutputTokens: config.maxOutputTokens,
@@ -239,13 +316,33 @@ async function generateCommitMessage(
               },
             },
           );
+        } catch (error) {
+          // Fallback chain
+          if (effectiveProvider !== 'rulebased') {
+            logger.info('Falling back to rule-based provider...');
+            const fallback = new RuleBasedProvider();
+            try {
+              return await fallback.generate(prompt, {
+                model: 'rule-based',
+                baseUrl: '',
+                apiKey: undefined,
+                temperature: config.temperature,
+                maxOutputTokens: config.maxOutputTokens,
+                signal: controller.signal,
+              });
+            } catch {
+              throw error;
+            }
+          }
+          throw error;
         } finally {
           cancellation.dispose();
         }
       },
     );
 
-    const message = sanitizeCommitMessage(result.text);
+    const resultAny = result as any;
+    const message = sanitizeCommitMessage(resultAny.text);
     if (!message) {
       statusBar.showError('Empty response');
       void vscode.window.showErrorMessage(
@@ -255,12 +352,12 @@ async function generateCommitMessage(
     }
 
     repository.inputBox.value = message;
-    statusBar.showIdle(preset.label, result.model);
-    logger.info('Commit message written to the SCM input box.');
+    statusBar.showIdle(`${preset.label} (${resultAny.model})`, resultAny.model);
+    logger.info(`Commit message written to the SCM input box. Engine: ${resultAny.model}`);
   } catch (error) {
     if (error instanceof ProviderError && error.kind === 'cancelled') {
       logger.info('The generation was cancelled by the user.');
-      statusBar.showIdle(preset.label, resolveModel(config));
+      statusBar.showIdle(`${preset.label} (${resolveModel({ ...config, provider: effectiveProvider as any })})`, resolveModel({ ...config, provider: effectiveProvider as any }));
       return;
     }
 

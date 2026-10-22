@@ -1,208 +1,220 @@
 # Whycommit
 
-**Write good commit messages without thinking about them.**
+**Tagline:** Generate meaningful Git commit messages from your staged changes - free and offline by default, with optional AI providers.
 
-Whycommit reads the changes you have **staged** in git, sends them to an LLM
-(Anthropic Claude, OpenAI, Gemini, Groq, OpenRouter, OpenCode Zen, a local
-Ollama model or any other OpenAI-compatible endpoint) and writes a meaningful
-Conventional Commits message straight into the Source Control input box.
+![Version](https://img.shields.io/badge/version-0.2.0-blue) ![License](https://img.shields.io/badge/license-Source--available-red) ![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.85.0-blue) ![CI](https://img.shields.io/badge/CI-available-green)
 
----
+## Why Whycommit?
+
+Writing good commit messages is tedious. Whycommit analyzes your staged diff and generates a Conventional Commits message in seconds. It has a unique "Why" input idea - you can explain the reasoning and it gets included in the body. Best of all, it works offline with no API key required.
 
 ## Features
 
-- **Staged-changes only.** Whycommit never looks at unstaged or untracked files.
-- **One click.** A button in the Source Control title bar, or `Ctrl+Shift+P` →
-  _Whycommit: Generate Commit Message_.
-- **Seven provider presets, one interface.** Pick a preset and the base URL and
-  a sensible default model are filled in for you.
-- **Secrets stay secret.** API keys live only in the VS Code `SecretStorage`.
-  They are never written to settings, logs, the repository or a `.env` file.
-- **Your diff is scanned before it leaves the machine.** Credentials that are
-  staged by accident are masked before the request is sent.
-- **Diff aware.** Binary files and dependency lockfiles are skipped, huge diffs
-  are truncated to a token budget, and a statistics header keeps the model
-  oriented even when parts of the diff had to be cut.
-- **Context aware.** The current branch, the detected commit style and your
-  recent commit messages are used as a reference, so the output matches how
-  _you_ write commits.
-- **Repository conventions.** A `.commitrc` file can pin down the allowed types,
-  scopes, language and subject length.
-- **English or Hinglish.** Pick the language of the generated message.
-- **Resilient.** Rate limits (429) and server errors (5xx) are retried with an
-  exponential backoff, and every request can be cancelled.
-- **Works everywhere.** Empty repositories, detached HEADs, repositories without
-  a remote and multi-root workspaces are all handled.
+- **Generate message** - Create commit messages from staged changes with one command or SCM button
+- **Free offline mode** - Rule-based provider works with no setup, no API key, no network
+- **Auto provider** - Automatically picks the best available provider (rule-based, VS Code LM, or configured provider)
+- **Style learning** - Learns from your recent commits (conventional, casing, emoji, tense)
+- **"Why" input** - Add reasoning that appears as a "Why:" line in the commit body
+- **.commitrc.json** - Respects allowed types/scopes and max length
+- **Secret scanner** - Scans and redacts credentials before sending to remote providers
+- **Smart split** - Group changes by folder and type
+- **PR description** - Generate PR descriptions from changes
+- **Quality check** - Validate commit message quality
+- **Optional AI providers** - Use Anthropic, OpenAI, Gemini, Groq, OpenRouter, OpenCode Zen, Ollama, or VS Code LM if desired
+
+## Demo
+
+![Demo placeholder](docs/images/demo.gif)
+
+Example:
+
+```
+Input diff (src/auth.ts):
++function login() { if(!user) return null; }
+
+English output:
+fix: fix auth
+
+Body:
+- update auth.ts
+
+Hinglish output:
+fix: fix auth
+
+Body:
+- Why: better security
+```
 
 ## Requirements
 
-- VS Code `^1.85.0`
-- The built-in **Git** extension (`vscode.git`) — it is bundled with VS Code.
-- An API key for a cloud provider, **or** a running Ollama server.
+- **VS Code**: ^1.85.0 (see [package.json](package.json))
+- **Node.js**: >= 18 (LTS recommended) - see [requirements.txt](requirements.txt)
+- **npm**: >= 9
+- **git**: >= 2.30
+- Optional: **Ollama** with a model like llama3.2
+- Optional: API keys for Anthropic/OpenAI/Gemini/Groq/OpenRouter/OpenCode Zen
+- Optional: **@vscode/vsce** for packaging
 
-## Getting started
+## Installation
 
-1. Install the extension (or open this folder in VS Code and press `F5`).
-2. Choose a provider preset with the command **Whycommit: Select Provider**
-   (`Ctrl+Shift+P`). The command fills in the base URL and the default model.
-3. Store the API key with the command **Whycommit: Set API Key**. The key is
-   written to the OS keychain through the VS Code `SecretStorage`.
-4. Stage some changes (`git add ...`).
-5. Click the ✨ button in the Source Control title bar (or run
-   **Whycommit: Generate Commit Message**).
-6. The generated message appears in the SCM input box — review it and commit.
+### From the Marketplace (placeholder)
+Search for "Whycommit" in the VS Code Extensions marketplace.
 
-### Manual configuration
-
-Everything the presets do can also be done by hand:
-
-```jsonc
-{
-  "whycommit.provider": "anthropic", // see the table below
-  "whycommit.model": "", // empty = provider default
-  "whycommit.baseUrl": "", // empty = provider default
-  "whycommit.maxDiffTokens": 12000,
-  "whycommit.language": "english", // english | hinglish
-}
-```
-
-## Provider presets
-
-| Preset         | Base URL                                                  | Default model                 | API key |
-| -------------- | --------------------------------------------------------- | ----------------------------- | ------- |
-| Anthropic      | `https://api.anthropic.com/v1`                            | `claude-sonnet-4-5`           | yes     |
-| OpenAI         | `https://api.openai.com/v1`                               | `gpt-4o`                      | yes     |
-| Gemini         | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-2.5-flash`            | yes     |
-| Groq           | `https://api.groq.com/openai/v1`                          | `llama-3.3-70b-versatile`     | yes     |
-| OpenRouter     | `https://openrouter.ai/api/v1`                            | `anthropic/claude-sonnet-4.5` | yes     |
-| OpenCode Zen   | `https://opencode.ai/zen/v1`                              | `claude-sonnet-4-5`           | yes     |
-| Ollama (local) | `http://localhost:11434`                                  | `llama3.2`                    | no      |
-| Custom         | _your endpoint_                                           | _your model_                  | yes     |
-
-Every OpenAI-compatible preset (OpenAI, Gemini, Groq, OpenRouter, OpenCode Zen
-and Custom) talks to `POST {baseUrl}/chat/completions`.
-
-### Using Ollama (fully local)
-
+### From a .vsix
 ```bash
-ollama pull llama3.2
-ollama serve
+code --install-extension whycommit-0.2.0.vsix
 ```
 
-Then run **Whycommit: Select Provider** → **Ollama (local)**. No API key is
-required and nothing leaves your machine.
+### From source
+```bash
+git clone https://github.com/whycommit/whycommit.git
+cd whycommit
+npm install
+npm run build
+# Press F5 in VS Code to run Extension Development Host
+```
 
-### Using any other OpenAI-compatible endpoint
+## Quick start (4 steps, no key needed)
 
-Pick **Custom** in **Whycommit: Select Provider** and enter the base URL and the
-model id. Anything that implements `POST {baseUrl}/chat/completions` works,
-including LiteLLM, vLLM, a corporate gateway or a remote Ollama host.
+1. **Open a git repo** in VS Code
+2. **Stage changes** with `git add ...`
+3. **Generate**: Run `Whycommit: Generate Commit Message` from Command Palette or click the SCM button
+4. **Done** - Message appears in the SCM input box. Works offline by default!
 
-## Commands
+## Usage
 
-| Command                              | Description                                         |
-| ------------------------------------ | --------------------------------------------------- |
-| `Whycommit: Generate Commit Message` | Generates a message from the staged changes.        |
-| `Whycommit: Select Provider`         | Picks a preset and fills in its base URL and model. |
-| `Whycommit: Set API Key`             | Stores / replaces / removes a provider API key.     |
-| `Whycommit: Show Output Log`         | Opens the output channel with the extension log.    |
+| Command (Command Palette) | Command ID | Description |
+|---|---|---|
+| Whycommit: Generate Commit Message | `whycommit.generate` | Generate a commit message from staged changes |
+| Whycommit: Set API Key | `whycommit.setApiKey` | Store/remove API keys securely in SecretStorage |
+| Whycommit: Select Provider | `whycommit.selectProvider` | Choose provider and auto-fill baseUrl/model |
+| Whycommit: Show Output | `whycommit.showOutput` | Show the extension log output |
 
-## Settings
+The SCM button appears when in a git repository.
 
-| Setting                       | Type    | Default     | Description                                               |
-| ----------------------------- | ------- | ----------- | --------------------------------------------------------- |
-| `whycommit.provider`          | string  | `anthropic` | The provider preset (see the table above).                |
-| `whycommit.model`             | string  | `""`        | Model id. Empty uses the provider default.                |
-| `whycommit.baseUrl`           | string  | `""`        | API base URL. Empty uses the provider default.            |
-| `whycommit.maxDiffTokens`     | number  | `12000`     | Approximate token budget for the staged diff.             |
-| `whycommit.language`          | string  | `english`   | `english` or `hinglish`.                                  |
-| `whycommit.temperature`       | number  | `0.3`       | Sampling temperature.                                     |
-| `whycommit.maxOutputTokens`   | number  | `512`       | Maximum length of the generated message.                  |
-| `whycommit.recentCommitCount` | number  | `10`        | How many recent commits are used as a style reference.    |
-| `whycommit.maxRetries`        | number  | `2`         | How often a failed request is retried (429 and 5xx only). |
-| `whycommit.showStatusBar`     | boolean | `true`      | Show the Whycommit status bar item.                       |
+## Configuration
 
-## Repository conventions (`.commitrc`)
+| Setting | Default | Description |
+|---|---|---|
+| `whycommit.provider` | `auto` | Provider: auto, rulebased, vscode-lm, anthropic, openai, gemini, groq, openrouter, opencode, ollama, custom |
+| `whycommit.model` | `""` | Model id (empty = provider default) |
+| `whycommit.baseUrl` | `""` | Base URL (empty = provider default) |
+| `whycommit.maxDiffTokens` | `12000` | Token budget for staged diff |
+| `whycommit.language` | `english` | Output language: english or hinglish |
+| `whycommit.temperature` | `0.2` | Sampling temperature |
+| `whycommit.maxOutputTokens` | `512` | Max tokens in output |
+| `whycommit.recentCommitCount` | `10` | Recent commits used for style learning |
+| `whycommit.showStatusBar` | `true` | Show status bar item |
+| `whycommit.maxRetries` | `2` | Retries on 429/5xx with exponential backoff |
 
-Drop a `.commitrc` (or `.commitrc.json`) into the root of a repository to pin
-down the conventions Whycommit has to follow:
+### .commitrc.json example
 
 ```json
 {
-  "types": ["feat", "fix", "chore"],
-  "scopes": ["api", "ui"],
-  "language": "english",
-  "maxSubjectLength": 72,
-  "signOff": true
+  "types": ["feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore"],
+  "scopes": ["core", "api", "ui"],
+  "maxLength": 72,
+  "language": "english"
 }
 ```
 
-Every field is optional. An invalid file is ignored and reported in the output
-channel, so a typo can never break the extension.
+## Providers
 
-## Privacy
+| Provider | Free/Paid | Offline | Notes |
+|---|---|---|---|
+| `auto` | Free | Yes (falls back to rule-based) | Default. Uses rule-based if no key/Ollama, else tries VS Code LM or configured provider |
+| `rulebased` | Free | Yes | Deterministic, no network, works with no setup |
+| `vscode-lm` | Free (with Copilot) | No* | Uses GitHub Copilot via VS Code LM API if available |
+| `anthropic` | Paid | No | Requires API key via `Whycommit: Set API Key` |
+| `openai` | Paid | No | Requires API key |
+| `gemini` | Paid | No | OpenAI-compatible endpoint |
+| `groq` | Paid | No | OpenAI-compatible endpoint |
+| `openrouter` | Paid | No | OpenAI-compatible endpoint |
+| `opencode` | Varies | No | OpenCode Zen |
+| `ollama` | Free | Yes | Runs locally, nothing leaves machine |
+| `custom` | Varies | No | Any OpenAI-compatible endpoint |
 
-- The **staged diff** is the only thing that is sent to the provider. Unstaged
-  and untracked files are never read.
-- The diff is scanned for credentials first. Anything that looks like a key,
-  a token, a private key or a password is masked before the request is sent,
-  and you get a warning when that happens.
-- The first time a **cloud** provider is used, a one-time notice explains that
-  your code leaves the machine and points at **Ollama** as the local
-  alternative.
-- **API keys are never transmitted.** They are read from the VS Code
-  `SecretStorage` and sent as an authorization header, nothing else.
-- Nothing is written to your repository, the index or any file. Whycommit only
-  sets the text of the Source Control input box.
-- The output channel redacts anything that looks like a credential before it
-  is written.
+*VS Code LM requires network/auth depending on provider.
+
+API keys are stored securely in VS Code SecretStorage via `context.secrets`, never in settings or logs.
 
 ## Architecture
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for the details. In short:
+### Flow diagram
 
 ```
-staged diff (vscode.git API)
-  -> diffProcessor  (skip binary/lockfiles, truncate to the token budget)
-  -> secretScanner  (mask credentials before anything leaves the machine)
-  -> promptBuilder  (system.txt + commit.txt + branch + style + .commitrc)
-  -> LlmProvider    (Anthropic | OpenAI-compatible | Ollama) with retries
-  -> sanitizeCommitMessage
-  -> repo.inputBox.value
+Staged diff -> GitService -> Secret scan (redact) -> Diff processor (budget) -> Style detection + .commitrc -> PromptBuilder -> Provider chain (auto: rulebased/vscode-lm/configured) -> Sanitize -> SCM input box
 ```
+
+### Folder tree
+
+```
+src/
+├── extension.ts        # Main entry, commands, flow
+├── config/settings.ts  # Settings, presets, resolution
+├── git/gitService.ts   # vscode.git wrapper + hardening
+├── llm/                # Providers (anthropic, openaiCompatible, ollama, vscodeLm, ruleBased, retry, http)
+├── core/               # Diff processing, prompts, secret scanner, style detector, commitrc, ruleEngine
+├── ui/                 # Status bar, SCM button, privacy notice
+├── utils/              # Logger, commit message sanitizer, JSON helpers
+└── types/              # Local typings
+test/                   # Vitest unit tests
+```
+
+### Adding a new provider
+1. Add type to `ProviderId` in `src/config/settings.ts`
+2. Add preset to `PROVIDER_PRESETS` and to `PROVIDER_ORDER`
+3. Implement `LlmProvider` in `src/llm/` or extend `OpenAICompatibleProvider`
+4. Update `createProvider()` in `src/llm/provider.ts`
+5. Add tests
+
+## Privacy and security
+
+- **Offline by default**: Rule-based mode sends nothing
+- **Secret redaction**: Staged diff scanned for credentials before sending to remote models
+- **Secure storage**: API keys stored in VS Code SecretStorage only
+- **Logging**: Secrets redacted from logs
+- **Privacy notice**: Shown once for cloud providers
 
 ## Development
 
-```bash
-npm install        # install the toolchain
-npm run build      # bundle to out/extension.js (production, minified)
-npm run watch      # rebuild on change
-npm run typecheck  # strict TypeScript check
-npm run lint       # ESLint
-npm run format     # Prettier
-npm test           # run the vitest suite
-npm run package    # build and produce a .vsix
-npm run security:scan  # scan the repository and the git history for secrets
-```
+| Script | Description |
+|---|---|
+| `npm run build` | Build with esbuild (production) |
+| `npm run watch` | Watch mode |
+| `npm test` | Run vitest tests |
+| `npm run lint` | Run ESLint |
+| `npm run typecheck` | Run TypeScript type checking |
+| `npm run package` | Build and package .vsix with vsce |
 
-See [RELEASE.md](./RELEASE.md) for the manual steps of a Marketplace release.
+Debug with F5 (Extension Development Host). Tests run with `npm test`.
 
-### Running the extension (F5)
+## Troubleshooting / FAQ
 
-1. Open this folder in VS Code.
-2. Make sure the Git extension is enabled (it is by default).
-3. Press `F5` — or use the **Run and Debug** panel and pick
-   **Run Whycommit**. A second VS Code window opens with the extension loaded.
-4. The `npm: watch` task starts automatically and rebuilds `out/extension.js`
-   whenever you change a file, so you only have to reload the Extension
-   Development Host (`Ctrl+R`).
-5. In the Extension Development Host, stage a change in the test repository and
-   click the ✨ button in the Source Control view.
+- **No staged changes**: Stage files with `git add` first
+- **Key errors**: Use `Whycommit: Set API Key` to store/remove keys
+- **Rate limits**: Automatic retry with exponential backoff; try again later
+- **Ollama not running**: Start Ollama or switch provider
+- **Message too generic**: Add more context or use "Why" input; rule-based uses heuristics from your diff
+
+## Roadmap
+
+- More language support
+- Better symbol extraction
+- Custom templates
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
+
+## Contributing
+
+Source-available. Issues welcome. Code reuse not permitted.
 
 ## License
 
-<!-- prettier-ignore -->
-**Source-available. All rights reserved. Copying, redistribution or reuse is not permitted.**
+Source-available. All rights reserved. Copying, redistribution or reuse is not permitted.
 
-Copyright (c) 2026 Shaikh Inshra. This software and its source code are
-proprietary. See [LICENSE](./LICENSE) for the full terms.
+## Author
+
+Shaikh Inshra

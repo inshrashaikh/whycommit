@@ -5,6 +5,20 @@ All notable changes to Whycommit are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-10-22
+
+### Added
+- Free offline mode with rule-based provider (no API key, no network)
+- `auto` provider as default with fallback chain
+- VS Code LM provider support (GitHub Copilot)
+- Rule engine with heuristics for type/scope detection, English and Hinglish support
+- "Why" input included in commit body
+- First-run info message
+
+### Changed
+- Default provider changed from `anthropic` to `auto`
+- README rewritten with comprehensive documentation
+
 ## [0.1.0] - 2026-10-22
 
 The first public release.

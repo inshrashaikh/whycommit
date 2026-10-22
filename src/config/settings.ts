@@ -4,7 +4,17 @@
 import * as vscode from 'vscode';
 
 export type ProviderId =
-  'anthropic' | 'openai' | 'gemini' | 'groq' | 'openrouter' | 'opencode' | 'ollama' | 'custom';
+  | 'auto'
+  | 'rulebased'
+  | 'vscode-lm'
+  | 'anthropic'
+  | 'openai'
+  | 'gemini'
+  | 'groq'
+  | 'openrouter'
+  | 'opencode'
+  | 'ollama'
+  | 'custom';
 
 export type OutputLanguage = 'english' | 'hinglish';
 
@@ -58,6 +68,33 @@ export const CONFIG_SECTION = 'whycommit';
  * any other OpenAI-compatible endpoint.
  */
 export const PROVIDER_PRESETS: Record<ProviderId, ProviderPreset> = {
+  auto: {
+    id: 'auto',
+    label: 'Auto (free & offline first)',
+    defaultModel: '',
+    defaultBaseUrl: '',
+    requiresApiKey: false,
+    isLocal: true,
+    hint: 'Tries rule-based first if no key/Ollama available, otherwise uses configured/cloud or VS Code LM.',
+  },
+  rulebased: {
+    id: 'rulebased',
+    label: 'Rule-based (offline)',
+    defaultModel: 'rule-based',
+    defaultBaseUrl: '',
+    requiresApiKey: false,
+    isLocal: true,
+    hint: 'Generates messages from diffs with no network. Always available.',
+  },
+  'vscode-lm': {
+    id: 'vscode-lm',
+    label: 'VS Code Language Models (Copilot)',
+    defaultModel: '',
+    defaultBaseUrl: '',
+    requiresApiKey: false,
+    isLocal: false,
+    hint: 'Uses GitHub Copilot via VS Code LM API if available. No API key needed.',
+  },
   anthropic: {
     id: 'anthropic',
     label: 'Anthropic Claude',
@@ -65,7 +102,7 @@ export const PROVIDER_PRESETS: Record<ProviderId, ProviderPreset> = {
     defaultBaseUrl: 'https://api.anthropic.com/v1',
     requiresApiKey: true,
     isLocal: false,
-    hint: 'The default provider. Requires an Anthropic API key.',
+    hint: 'Requires an Anthropic API key.',
   },
   openai: {
     id: 'openai',
@@ -134,6 +171,9 @@ export const PROVIDER_PRESETS: Record<ProviderId, ProviderPreset> = {
 
 /** The provider ids in the order they are shown in the picker. */
 export const PROVIDER_ORDER: ProviderId[] = [
+  'auto',
+  'rulebased',
+  'vscode-lm',
   'anthropic',
   'openai',
   'gemini',

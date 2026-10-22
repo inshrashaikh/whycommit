@@ -2,7 +2,7 @@
   "name": "whycommit",
   "displayName": "Whycommit",
   "description": "Generates meaningful Git commit messages from your staged changes using Claude, OpenAI, Gemini, Groq, OpenRouter, OpenCode Zen or a local Ollama model.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "whycommit",
   "license": "SEE LICENSE IN LICENSE",
   "private": true,
@@ -120,6 +120,9 @@
         "whycommit.provider": {
           "type": "string",
           "enum": [
+            "auto",
+            "rulebased",
+            "vscode-lm",
             "anthropic",
             "openai",
             "gemini",
@@ -130,7 +133,10 @@
             "custom"
           ],
           "enumDescriptions": [
-            "Anthropic Claude (default)",
+            "Auto (free & offline first) - uses rule-based if no key/Ollama, else tries VS Code LM",
+            "Rule-based (offline, deterministic, no network) - works with no setup",
+            "VS Code Language Models (Copilot) - no API key needed if signed in",
+            "Anthropic Claude",
             "OpenAI",
             "Google Gemini through its OpenAI-compatible endpoint",
             "Groq",
@@ -139,8 +145,8 @@
             "Ollama - runs locally, nothing leaves your machine",
             "Any other OpenAI-compatible endpoint"
           ],
-          "default": "anthropic",
-          "description": "Which LLM provider generates the commit message."
+          "default": "auto",
+          "description": "Which LLM/provider generates the commit message."
         },
         "whycommit.model": {
           "type": "string",

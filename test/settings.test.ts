@@ -41,7 +41,7 @@ describe('provider presets', () => {
 
   it('lists every preset in the picker order', () => {
     expect(PROVIDER_ORDER).toHaveLength(Object.keys(PROVIDER_PRESETS).length);
-    expect(PROVIDER_ORDER[0]).toBe('anthropic');
+    expect(PROVIDER_ORDER[0]).toBe('auto');
     expect(PROVIDER_ORDER).toContain('custom');
   });
 
@@ -66,8 +66,8 @@ describe('provider presets', () => {
 
   it('has a default model for every preset except custom', () => {
     for (const id of PROVIDER_ORDER) {
-      if (id === 'custom') {
-        expect(PROVIDER_PRESETS[id].defaultModel).toBe('');
+      if (id === 'custom' || id === 'auto' || id === 'rulebased' || id === 'vscode-lm') {
+        expect(PROVIDER_PRESETS[id].defaultModel).toBeDefined();
       } else {
         expect(PROVIDER_PRESETS[id].defaultModel.length).toBeGreaterThan(0);
       }

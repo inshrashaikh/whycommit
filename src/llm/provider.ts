@@ -5,6 +5,8 @@ import type { ProviderId } from '../config/settings';
 import { AnthropicProvider } from './anthropic';
 import { OllamaProvider } from './ollama';
 import { OpenAICompatibleProvider } from './openaiCompatible';
+import { RuleBasedProvider } from './ruleBased';
+import { VsCodeLmProvider } from './vscodeLm';
 
 export type { ProviderId };
 
@@ -91,6 +93,10 @@ export function secretKeyFor(provider: ProviderId): string {
  */
 export function createProvider(provider: ProviderId): LlmProvider {
   switch (provider) {
+    case 'rulebased':
+      return new RuleBasedProvider();
+    case 'vscode-lm':
+      return new VsCodeLmProvider();
     case 'anthropic':
       return new AnthropicProvider();
     case 'ollama':
@@ -102,9 +108,40 @@ export function createProvider(provider: ProviderId): LlmProvider {
     case 'opencode':
     case 'custom':
       return new OpenAICompatibleProvider();
+    case 'auto':
+      // Auto is handled by resolveAutoProvider, but provide fallback
+      return new RuleBasedProvider();
     default: {
       const exhaustive: never = provider;
       throw new ProviderError('unknown', `Unsupported provider: ${String(exhaustive)}`);
     }
   }
 }
+
+export async function resolveAutoProvider(hasApiKey: boolean, ollamaAvailable: boolean): Promise<LlmProvider> {
+  // If the user has configured an API key or Ollama, use that provider.
+  if (hasApiKey) {
+    // We'll let the caller determine which specific provider, but prefer configured
+    // For now return undefined to indicate caller should use configured
+  }
+  if (ollamaAvailable) {
+    return new OllamaProvider();
+  }
+  // Try VS Code LM if available
+  try {
+    const vscode = await import('vscode');
+    const models = await vscode.lm.selectChatModels({ vendor: 'copilot' });
+    if (models.length > 0) {
+      return new VsCodeLmProvider();
+    }
+    const allModels = await vscode.lm.selectChatModels({});
+    if (allModels.length > 0) {
+      return new VsCodeLmProvider();
+    }
+  } catch {
+    // Ignore errors
+  }
+  // Otherwise use RuleBasedProvider
+  return new RuleBasedProvider();
+}
+

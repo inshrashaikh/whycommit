@@ -1,0 +1,15 @@
+# Whycommit prerequisites
+# npm dependencies are in package.json
+
+# Runtime / Development
+Node.js >= 18 (LTS recommended)
+npm >= 9
+VS Code >= ^1.85.0
+git >= 2.30
+
+# Optional
+Ollama (https://ollama.ai) with a suggested model (e.g., llama3.2)
+API keys for Anthropic/OpenAI/Gemini/Groq/OpenRouter/OpenCode Zen (if using remote providers)
+@vscode/vsce for packaging (npm install -g @vscode/vsce or use npx)
+
+# See README.md Requirements section for details
