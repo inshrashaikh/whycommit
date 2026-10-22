@@ -5,9 +5,29 @@ All notable changes to Whycommit are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `requirements.txt` documenting the Node.js, npm, VS Code, git, Ollama, API key and packaging prerequisites.
+- Tests for backticked function and file names in rule-based subjects and for omitting the scope when all files are in the repository root.
+
+### Changed
+
+- Rule-based subjects now wrap function, class and file names in backticks.
+- Rule-based scope detection omits the scope when every changed file is in the repository root.
+- README rewritten to match the current commands, providers, settings and architecture.
+- Repository metadata and documentation now point to `https://github.com/inshrashaikh/Msgit`.
+
+### Fixed
+
+- The Whycommit generate button is visible in the Source Control title bar again.
+- Prettier formatting so the CI `format:check` step passes.
+
 ## [0.2.0] - 2026-10-22
 
 ### Added
+
 - Free offline mode with rule-based provider (no API key, no network)
 - `auto` provider as default with fallback chain
 - VS Code LM provider support (GitHub Copilot)
@@ -16,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - First-run info message
 
 ### Changed
+
 - Default provider changed from `anthropic` to `auto`
 - README rewritten with comprehensive documentation
 
@@ -67,4 +88,6 @@ The first public release.
   written to settings, logs, the repository or a `.env` file.
 - The staged diff is scanned for credentials before it is sent to a provider.
 
-[0.1.0]: https://github.com/whycommit/whycommit/releases/tag/v0.1.0
+[0.2.0]: https://github.com/inshrashaikh/Msgit/releases/tag/v0.2.0
+[0.1.0]: https://github.com/inshrashaikh/Msgit/releases/tag/v0.1.0
+[Unreleased]: https://github.com/inshrashaikh/Msgit/compare/v0.2.0...HEAD
