@@ -1,7 +1,7 @@
 {
   "name": "whycommit",
   "displayName": "Whycommit",
-  "description": "Generates meaningful Git commit messages from your staged changes using Claude, OpenAI-compatible APIs, or a local Ollama model.",
+  "description": "Generates meaningful Git commit messages from your staged changes using Claude, OpenAI, Gemini, Groq, OpenRouter, OpenCode Zen or a local Ollama model.",
   "version": "0.1.0",
   "publisher": "whycommit",
   "license": "SEE LICENSE IN LICENSE",
@@ -9,23 +9,44 @@
   "author": {
     "name": "Shaikh Inshra"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/whycommit/whycommit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/whycommit/whycommit/issues"
+  },
+  "homepage": "https://github.com/whycommit/whycommit#readme",
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.85.0",
+    "node": ">=18"
   },
   "categories": [
     "SCM Providers",
-    "Other"
+    "Other",
+    "Machine Learning"
   ],
   "keywords": [
     "git",
     "commit",
     "commit message",
+    "conventional commits",
     "ai",
+    "llm",
     "claude",
     "anthropic",
     "openai",
-    "ollama"
+    "gemini",
+    "groq",
+    "openrouter",
+    "ollama",
+    "opencode"
   ],
+  "icon": "assets/icon.png",
+  "galleryBanner": {
+    "color": "#12141a",
+    "theme": "dark"
+  },
   "main": "./out/extension.js",
   "activationEvents": [
     "onStartupFinished"
@@ -48,10 +69,22 @@
         "icon": "$(sparkle)"
       },
       {
+        "command": "whycommit.selectProvider",
+        "title": "Whycommit: Select Provider",
+        "category": "Whycommit",
+        "icon": "$(server)"
+      },
+      {
         "command": "whycommit.setApiKey",
         "title": "Whycommit: Set API Key",
         "category": "Whycommit",
         "icon": "$(key)"
+      },
+      {
+        "command": "whycommit.showOutput",
+        "title": "Whycommit: Show Output Log",
+        "category": "Whycommit",
+        "icon": "$(output)"
       }
     ],
     "menus": {
@@ -68,7 +101,15 @@
           "when": "true"
         },
         {
+          "command": "whycommit.selectProvider",
+          "when": "true"
+        },
+        {
           "command": "whycommit.setApiKey",
+          "when": "true"
+        },
+        {
+          "command": "whycommit.showOutput",
           "when": "true"
         }
       ]
@@ -81,12 +122,22 @@
           "enum": [
             "anthropic",
             "openai",
-            "ollama"
+            "gemini",
+            "groq",
+            "openrouter",
+            "opencode",
+            "ollama",
+            "custom"
           ],
           "enumDescriptions": [
             "Anthropic Claude (default)",
-            "OpenAI or any OpenAI-compatible endpoint",
-            "Local Ollama server"
+            "OpenAI",
+            "Google Gemini through its OpenAI-compatible endpoint",
+            "Groq",
+            "OpenRouter",
+            "OpenCode Zen (https://opencode.ai/zen/v1)",
+            "Ollama - runs locally, nothing leaves your machine",
+            "Any other OpenAI-compatible endpoint"
           ],
           "default": "anthropic",
           "description": "Which LLM provider generates the commit message."
@@ -142,6 +193,13 @@
           "maximum": 50,
           "description": "How many recent commit messages are sent as a style reference."
         },
+        "whycommit.maxRetries": {
+          "type": "number",
+          "default": 2,
+          "minimum": 0,
+          "maximum": 5,
+          "description": "How often a failed request is retried. Rate limits (429) and server errors (5xx) are retried with exponential backoff."
+        },
         "whycommit.showStatusBar": {
           "type": "boolean",
           "default": true,
@@ -155,10 +213,13 @@
     "watch": "node esbuild.js --watch",
     "compile": "tsc --noEmit -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "lint": "eslint src --ext .ts",
-    "format": "prettier --write \"src/**/*.ts\" \"*.json\" \"*.md\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"*.json\" \"*.md\"",
-    "test": "npm run typecheck",
+    "lint": "eslint src test --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"*.json\" \"*.md\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"*.json\" \"*.md\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "security:scan": "node scripts/security-scan.js",
     "package": "npm run build && vsce package --no-dependencies --allow-missing-repository",
     "vscode:prepublish": "npm run build"
   },
@@ -171,6 +232,7 @@
     "esbuild": "^0.23.0",
     "eslint": "^8.57.0",
     "prettier": "^3.3.3",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "vitest": "^3.2.0"
   }
 }

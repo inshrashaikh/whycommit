@@ -83,15 +83,25 @@ export function secretKeyFor(provider: ProviderId): string {
   return `whycommit.apiKey.${provider}`;
 }
 
-/** Creates the provider implementation for the given provider id. */
+/**
+ * Creates the provider implementation for the given provider id.
+ *
+ * Anthropic and Ollama speak their own protocols, everything else uses the
+ * OpenAI Chat Completions format.
+ */
 export function createProvider(provider: ProviderId): LlmProvider {
   switch (provider) {
     case 'anthropic':
       return new AnthropicProvider();
-    case 'openai':
-      return new OpenAICompatibleProvider();
     case 'ollama':
       return new OllamaProvider();
+    case 'openai':
+    case 'gemini':
+    case 'groq':
+    case 'openrouter':
+    case 'opencode':
+    case 'custom':
+      return new OpenAICompatibleProvider();
     default: {
       const exhaustive: never = provider;
       throw new ProviderError('unknown', `Unsupported provider: ${String(exhaustive)}`);
