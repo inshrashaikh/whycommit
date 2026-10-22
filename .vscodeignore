@@ -2,9 +2,12 @@
 .github/**
 src/**
 test/**
+scripts/**
 **/*.ts
 **/*.map
+**/*.tsbuildinfo
 tsconfig.json
+vitest.config.ts
 .gitignore
 .eslintrc.json
 .eslintignore
@@ -12,4 +15,5 @@ tsconfig.json
 .prettierignore
 esbuild.js
 node_modules/**
+package-lock.json
 *.vsix

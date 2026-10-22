@@ -37,6 +37,12 @@ const diagnosticsPlugin = {
   },
 };
 
+/** The copyright header that is kept in the bundle. */
+const COPYRIGHT_BANNER = `/*!
+ * Copyright (c) 2026 Shaikh Inshra. All rights reserved.
+ * Proprietary - see LICENSE. No copying, modification, distribution or reuse permitted.
+ */`;
+
 /** @type {import('esbuild').BuildOptions} */
 const options = {
   entryPoints: ['src/extension.ts'],
@@ -50,6 +56,10 @@ const options = {
   sourcemap: !production,
   sourcesContent: false,
   logLevel: 'silent',
+  // Every comment is stripped from the bundle, the copyright header is added
+  // back through the banner below.
+  legalComments: 'none',
+  banner: { js: COPYRIGHT_BANNER },
   // Prompt templates are plain text files that are inlined into the bundle.
   loader: { '.txt': 'text' },
   plugins: [diagnosticsPlugin],
