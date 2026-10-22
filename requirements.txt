@@ -1,15 +1,27 @@
 # Whycommit prerequisites
-# npm dependencies are in package.json
+#
+# This file lists the plain-text prerequisites for building and running
+# Whycommit. The actual npm dependencies live in package.json and are installed
+# with `npm install` (the exact versions are pinned in package-lock.json).
 
-# Runtime / Development
+# Required runtime / development tools
 Node.js >= 18 (LTS recommended)
 npm >= 9
-VS Code >= ^1.85.0
+VS Code ^1.85.0 (see the engines field in package.json)
 git >= 2.30
 
-# Optional
-Ollama (https://ollama.ai) with a suggested model (e.g., llama3.2)
-API keys for Anthropic/OpenAI/Gemini/Groq/OpenRouter/OpenCode Zen (if using remote providers)
-@vscode/vsce for packaging (npm install -g @vscode/vsce or use npx)
+# Optional: local model (no API key, nothing leaves your machine)
+Ollama (https://ollama.ai) with a model such as llama3.2
 
-# See README.md Requirements section for details
+# Optional: API keys for remote providers
+Anthropic (Claude)
+OpenAI
+Google Gemini
+Groq
+OpenRouter
+OpenCode Zen
+
+# Optional: packaging a .vsix
+@vscode/vsce (install globally or run with npx)
+
+# See the Requirements section of README.md for details.

@@ -10,6 +10,7 @@ tsconfig.json
 vitest.config.ts
 .securityscanignore
 RELEASE.md
+requirements.txt
 .gitignore
 .eslintrc.json
 .eslintignore
