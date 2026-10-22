@@ -17,7 +17,13 @@ import { PromptBuilder } from './core/promptBuilder';
 import { scanSecrets } from './core/secretScanner';
 import { detectStyle } from './core/styleDetector';
 import { GitService } from './git/gitService';
-import { createProvider, ProviderError, secretKeyFor } from './llm/provider';
+import {
+  createProvider,
+  ProviderError,
+  secretKeyFor,
+  type LlmProvider,
+  type ProviderResult,
+} from './llm/provider';
 import { withRetry } from './llm/retry';
 import { PrivacyNotice } from './ui/privacyNotice';
 import { ScmButton } from './ui/scmButton';
@@ -120,13 +126,17 @@ async function generateCommitMessage(
 
   const config = getConfig();
   let effectiveProvider = config.provider;
-  
+
   // Auto resolution
   if (effectiveProvider === 'auto') {
     // Check for API keys in common providers or Ollama
     const ollamaKey = await context.secrets.get(secretKeyFor('ollama'));
     const anthropicKey = await context.secrets.get(secretKeyFor('anthropic'));
-    const hasApiKey = !!(ollamaKey || anthropicKey || (await context.secrets.get(secretKeyFor('openai'))));
+    const hasApiKey = !!(
+      ollamaKey ||
+      anthropicKey ||
+      (await context.secrets.get(secretKeyFor('openai')))
+    );
     // Try Ollama if available
     try {
       const response = await fetch('http://localhost:11434/api/tags');
@@ -162,23 +172,27 @@ async function generateCommitMessage(
       }
     }
   }
-  
-  const preset = PROVIDER_PRESETS[effectiveProvider as keyof typeof PROVIDER_PRESETS] || PROVIDER_PRESETS[config.provider];
+
+  const preset =
+    PROVIDER_PRESETS[effectiveProvider as keyof typeof PROVIDER_PRESETS] ||
+    PROVIDER_PRESETS[config.provider];
 
   // First-run experience
   const firstRunKey = 'whycommit.firstRunShown';
   if (!(context.globalState.get(firstRunKey) as boolean)) {
-    void vscode.window.showInformationMessage(
-      'Whycommit works offline. Add an API key or Ollama for smarter messages.',
-      'Set API Key',
-      'Use Ollama',
-    ).then((action) => {
-      if (action === 'Set API Key') {
-        void setApiKey(context, logger);
-      } else if (action === 'Use Ollama') {
-        void vscode.env.openExternal(vscode.Uri.parse('https://ollama.ai'));
-      }
-    });
+    void vscode.window
+      .showInformationMessage(
+        'Whycommit works offline. Add an API key or Ollama for smarter messages.',
+        'Set API Key',
+        'Use Ollama',
+      )
+      .then((action) => {
+        if (action === 'Set API Key') {
+          void setApiKey(context, logger);
+        } else if (action === 'Use Ollama') {
+          void vscode.env.openExternal(vscode.Uri.parse('https://ollama.ai'));
+        }
+      });
     await context.globalState.update(firstRunKey, true);
   }
 
@@ -270,23 +284,23 @@ async function generateCommitMessage(
   });
 
   // 6. Call the provider.
-  let provider: any;
+  let provider: LlmProvider;
   try {
     if (effectiveProvider === 'rulebased') {
       provider = new RuleBasedProvider();
     } else if (effectiveProvider === 'vscode-lm') {
       provider = new VsCodeLmProvider();
     } else {
-      provider = createProvider(effectiveProvider as any);
+      provider = createProvider(effectiveProvider);
     }
   } catch {
     provider = new RuleBasedProvider();
   }
-  
+
   statusBar.showBusy();
 
   try {
-    const result = await vscode.window.withProgress(
+    const result: ProviderResult = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
         title: `Whycommit: generating a commit message with ${preset.label}...`,
@@ -299,8 +313,8 @@ async function generateCommitMessage(
           return await withRetry(
             () =>
               provider.generate(prompt, {
-                model: resolveModel({ ...config, provider: effectiveProvider as any }),
-                baseUrl: resolveBaseUrl({ ...config, provider: effectiveProvider as any }),
+                model: resolveModel({ ...config, provider: effectiveProvider }),
+                baseUrl: resolveBaseUrl({ ...config, provider: effectiveProvider }),
                 apiKey,
                 temperature: config.temperature,
                 maxOutputTokens: config.maxOutputTokens,
@@ -341,8 +355,7 @@ async function generateCommitMessage(
       },
     );
 
-    const resultAny = result as any;
-    const message = sanitizeCommitMessage(resultAny.text);
+    const message = sanitizeCommitMessage(result.text);
     if (!message) {
       statusBar.showError('Empty response');
       void vscode.window.showErrorMessage(
@@ -352,12 +365,15 @@ async function generateCommitMessage(
     }
 
     repository.inputBox.value = message;
-    statusBar.showIdle(`${preset.label} (${resultAny.model})`, resultAny.model);
-    logger.info(`Commit message written to the SCM input box. Engine: ${resultAny.model}`);
+    statusBar.showIdle(`${preset.label} (${result.model})`, result.model);
+    logger.info(`Commit message written to the SCM input box. Engine: ${result.model}`);
   } catch (error) {
     if (error instanceof ProviderError && error.kind === 'cancelled') {
       logger.info('The generation was cancelled by the user.');
-      statusBar.showIdle(`${preset.label} (${resolveModel({ ...config, provider: effectiveProvider as any })})`, resolveModel({ ...config, provider: effectiveProvider as any }));
+      statusBar.showIdle(
+        `${preset.label} (${resolveModel({ ...config, provider: effectiveProvider })})`,
+        resolveModel({ ...config, provider: effectiveProvider }),
+      );
       return;
     }
 

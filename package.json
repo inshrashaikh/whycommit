@@ -11,12 +11,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/whycommit/whycommit.git"
+    "url": "https://github.com/inshrashaikh/Msgit.git"
   },
   "bugs": {
-    "url": "https://github.com/whycommit/whycommit/issues"
+    "url": "https://github.com/inshrashaikh/Msgit/issues"
   },
-  "homepage": "https://github.com/whycommit/whycommit#readme",
+  "homepage": "https://github.com/inshrashaikh/Msgit#readme",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=18"
@@ -91,8 +91,8 @@
       "scm/title": [
         {
           "command": "whycommit.generate",
-          "when": "scmProvider == 'git' && whycommit.hasRepository",
-          "group": "navigation@1"
+          "when": "scmProvider == git",
+          "group": "navigation"
         }
       ],
       "commandPalette": [
