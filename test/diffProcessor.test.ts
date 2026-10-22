@@ -98,6 +98,12 @@ describe('isLockfile', () => {
     expect(isLockfile('src/index.ts')).toBe(false);
     expect(isLockfile('README.md')).toBe(false);
   });
+
+  it('keeps dependency manifests that carry meaning', () => {
+    // go.mod lists the dependencies of a Go module and is worth describing.
+    expect(isLockfile('go.mod')).toBe(false);
+    expect(isLockfile('go.sum')).toBe(true);
+  });
 });
 
 describe('countChanges', () => {

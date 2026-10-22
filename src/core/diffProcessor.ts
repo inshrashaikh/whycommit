@@ -39,7 +39,6 @@ const LOCKFILE_NAMES = new Set([
   'composer.lock',
   'gemfile.lock',
   'go.sum',
-  'go.mod',
   'poetry.lock',
   'pipfile.lock',
   'uv.lock',
