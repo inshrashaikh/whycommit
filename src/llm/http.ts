@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Shaikh Inshra. All rights reserved.
 // Proprietary - see LICENSE. No copying, modification, distribution or reuse permitted.
 
+import { extractErrorDetail, safeJsonParse } from '../utils/json';
 import { ProviderError, type ProviderErrorKind } from './provider';
 
 const DEFAULT_TIMEOUT_MS = 60_000;
@@ -31,27 +32,8 @@ export class HttpError extends Error {
   }
 }
 
-function extractDetail(payload: unknown, raw: string): string {
-  if (payload && typeof payload === 'object') {
-    const record = payload as Record<string, unknown>;
-    const error = record.error;
-    if (error && typeof error === 'object') {
-      const message = (error as Record<string, unknown>).message;
-      if (typeof message === 'string') {
-        return message;
-      }
-      if (typeof error === 'string') {
-        return error;
-      }
-    }
-    if (typeof record.message === 'string') {
-      return record.message;
-    }
-  }
-  return raw.slice(0, 500);
-}
-
-function mapStatusToKind(status: number): ProviderErrorKind {
+/** Maps an HTTP status onto a provider error kind. */
+export function mapStatusToKind(status: number): ProviderErrorKind {
   if (status === 401 || status === 403) {
     return 'unauthorized';
   }
@@ -96,17 +78,10 @@ export async function postJson<T>(request: JsonRequest): Promise<T> {
     });
 
     const raw = await response.text();
-    let payload: unknown = {};
-    if (raw.length > 0) {
-      try {
-        payload = JSON.parse(raw);
-      } catch {
-        payload = { raw };
-      }
-    }
+    const payload = safeJsonParse<unknown>(raw, { raw });
 
     if (!response.ok) {
-      throw new HttpError(response.status, response.statusText, extractDetail(payload, raw));
+      throw new HttpError(response.status, response.statusText, extractErrorDetail(payload, raw));
     }
 
     return payload as T;
