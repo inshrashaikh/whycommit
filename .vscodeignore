@@ -8,6 +8,7 @@ scripts/**
 **/*.tsbuildinfo
 tsconfig.json
 vitest.config.ts
+.securityscanignore
 .gitignore
 .eslintrc.json
 .eslintignore
