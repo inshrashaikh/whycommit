@@ -15,7 +15,7 @@ export class RuleBasedProvider implements LlmProvider {
     // Try to extract context from the user message if possible
     // The user message contains the diff and other context
     const userMessage = request.user;
-    
+
     // Parse diff from user message
     let rawDiff = '';
     const diffMatch = userMessage.match(/```diff\n([\s\S]*?)```/);
@@ -23,14 +23,16 @@ export class RuleBasedProvider implements LlmProvider {
       rawDiff = diffMatch[1];
     } else {
       // Try to find diff content
-      const stagedMatch = userMessage.match(/Staged diff:[\s\S]*?(?=\n\n[A-Z]|\nRecent commits:|$)/i);
+      const stagedMatch = userMessage.match(
+        /Staged diff:[\s\S]*?(?=\n\n[A-Z]|\nRecent commits:|$)/i,
+      );
       if (stagedMatch) {
         rawDiff = stagedMatch[0].replace(/Staged diff:/i, '').trim();
       }
     }
 
     const files = parseStagedDiff(rawDiff);
-    
+
     // Extract why if present
     let why: string | undefined;
     const whyMatch = userMessage.match(/Why:\s*([^\n]+)/i);

@@ -9,7 +9,7 @@ import { buildMessage } from './messageBuilder';
 export function runRuleEngine(input: RuleEngineInput): RuleEngineOutput {
   // If files already parsed, use them; otherwise parse
   const files = input.files.length > 0 ? input.files : parseStagedDiff(input.rawDiff);
-  
+
   if (files.length === 0) {
     // Empty diff case
     return {
@@ -24,7 +24,7 @@ export function runRuleEngine(input: RuleEngineInput): RuleEngineOutput {
 
   const type = selectPrimaryType(files);
   const scope = detectScope(files);
-  
+
   return buildMessage({ ...input, files }, type, scope);
 }
 

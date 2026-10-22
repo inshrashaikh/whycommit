@@ -18,7 +18,10 @@ export class VsCodeLmProvider implements LlmProvider {
         // Try any available model
         const allModels = await vscode.lm.selectChatModels({});
         if (allModels.length === 0) {
-          throw new ProviderError('unknown', 'No VS Code language models available. Sign in to GitHub Copilot or configure a model.');
+          throw new ProviderError(
+            'unknown',
+            'No VS Code language models available. Sign in to GitHub Copilot or configure a model.',
+          );
         }
         const model = allModels[0];
         const messages = [
@@ -30,7 +33,10 @@ export class VsCodeLmProvider implements LlmProvider {
           text += chunk;
         }
         if (!text.trim()) {
-          throw new ProviderError('empty-response', 'The VS Code language model returned an empty response.');
+          throw new ProviderError(
+            'empty-response',
+            'The VS Code language model returned an empty response.',
+          );
         }
         return {
           text: text.trim(),
@@ -48,7 +54,10 @@ export class VsCodeLmProvider implements LlmProvider {
         text += chunk;
       }
       if (!text.trim()) {
-        throw new ProviderError('empty-response', 'The VS Code language model returned an empty response.');
+        throw new ProviderError(
+          'empty-response',
+          'The VS Code language model returned an empty response.',
+        );
       }
       return {
         text: text.trim(),

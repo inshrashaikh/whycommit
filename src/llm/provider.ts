@@ -118,7 +118,10 @@ export function createProvider(provider: ProviderId): LlmProvider {
   }
 }
 
-export async function resolveAutoProvider(hasApiKey: boolean, ollamaAvailable: boolean): Promise<LlmProvider> {
+export async function resolveAutoProvider(
+  hasApiKey: boolean,
+  ollamaAvailable: boolean,
+): Promise<LlmProvider> {
   // If the user has configured an API key or Ollama, use that provider.
   if (hasApiKey) {
     // We'll let the caller determine which specific provider, but prefer configured
@@ -144,4 +147,3 @@ export async function resolveAutoProvider(hasApiKey: boolean, ollamaAvailable: b
   // Otherwise use RuleBasedProvider
   return new RuleBasedProvider();
 }
-
