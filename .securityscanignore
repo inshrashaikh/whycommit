@@ -1,0 +1,10 @@
+# Allow-list for the security scanner (npm run security:scan).
+#
+# Every path listed here is skipped by the credential and the personal data
+# scan. The reason has to be stated in a comment above the entry.
+#
+# The unit tests need realistic looking credentials to exercise the secret
+# scanner and the provider error handling. Every value in them is a
+# placeholder that was never valid and can never be used against a real
+# account.
+test/**
